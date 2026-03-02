@@ -1,0 +1,7 @@
+{
+  "name": "discord-rpc",
+  "label": "Discord Rich Presence",
+  "description": "Shows what you're listening to in your Discord status",
+  "version": "1.0.0",
+  "author": "SpotClient"
+}

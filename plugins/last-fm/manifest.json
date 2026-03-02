@@ -1,0 +1,7 @@
+{
+  "name": "last-fm",
+  "label": "Last.fm Scrobbler",
+  "description": "Scrobble your listening history to Last.fm",
+  "version": "1.0.0",
+  "author": "SpotClient"
+}

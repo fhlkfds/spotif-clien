@@ -1,0 +1,33 @@
+:root {
+  --bg-primary: #282a36;
+  --bg-secondary: #21222c;
+  --bg-tertiary: #2d2f3f;
+  --bg-elevated: #383a4a;
+  --bg-overlay: rgba(40, 42, 54, 0.85);
+
+  --text-primary: #f8f8f2;
+  --text-secondary: #bd93f9;
+  --text-muted: #6272a4;
+
+  --accent: #50fa7b;
+  --accent-hover: #69ff97;
+  --accent-muted: rgba(80, 250, 123, 0.15);
+
+  --sidebar-bg: #191a21;
+  --player-bg: #191a21;
+
+  --border: #44475a;
+  --border-light: #6272a4;
+
+  --scrollbar-thumb: #44475a;
+  --scrollbar-track: transparent;
+
+  --card-hover: #44475a;
+  --card-shadow: 0 8px 24px rgba(0, 0, 0, 0.6);
+
+  --progress-bg: #44475a;
+  --progress-fill: #bd93f9;
+
+  --danger: #ff5555;
+  --warning: #f1fa8c;
+}
