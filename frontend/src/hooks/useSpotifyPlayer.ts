@@ -66,7 +66,8 @@ export function useSpotifyPlayer() {
       volume: 0.5,
     });
 
-    player.addListener("ready", ({ device_id }: { device_id: string }) => {
+    player.addListener("ready", (state: unknown) => {
+      const { device_id } = state as { device_id: string };
       console.log("Spotify SDK ready, device:", device_id);
       setDeviceId(device_id);
       // Transfer playback to this device
@@ -87,7 +88,7 @@ export function useSpotifyPlayer() {
         item: {
           id: track.id,
           name: track.name,
-          artists: track.artists,
+          artists: track.artists.map((a) => ({ id: "", ...a })),
           album: {
             id: "",
             name: track.album.name,
