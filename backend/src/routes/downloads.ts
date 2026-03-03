@@ -27,11 +27,11 @@ downloadsRouter.post("/", async (req: Request, res: Response) => {
     return res.status(400).json({ error: "query or track_name required" });
   }
 
-  const searchQuery = query ?? `${artist_name} ${track_name} audio`;
+  const searchQuery = query ?? `${artist_name} - ${track_name}`;
   const downloadId = crypto.randomUUID();
-  const safeFilename = `${track_id ?? downloadId}_${Date.now()}.%(ext)s`
-    .replace(/[^a-zA-Z0-9._-]/g, "_");
-  const outputPath = path.join(DOWNLOADS_PATH, safeFilename);
+  // Build safe base name separately — don't let the regex touch %(ext)s template
+  const safeBase = `${track_id ?? downloadId}_${Date.now()}`.replace(/[^a-zA-Z0-9._-]/g, "_");
+  const outputPath = path.join(DOWNLOADS_PATH, `${safeBase}.%(ext)s`);
 
   // Insert pending record
   const { rows } = await pool.query(

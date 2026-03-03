@@ -55,6 +55,9 @@ export const spotify = {
   getRecommendations: (params: Record<string, string>) =>
     api.get("/spotify/recommendations", { params }).then((r) => r.data),
 
+  createPlaylist: (userId: string, name: string, description = "") =>
+    api.post(`/spotify/users/${userId}/playlists`, { name, description, public: false }).then((r) => r.data),
+
   getDevices: () => api.get("/spotify/devices").then((r) => r.data),
 };
 

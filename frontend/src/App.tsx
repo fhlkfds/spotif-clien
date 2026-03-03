@@ -4,6 +4,7 @@ import { auth, plugins as pluginsApi } from "./api/client";
 import { useStore } from "./store/useStore";
 import { useTheme } from "./hooks/useTheme";
 import { useSpotifyPlayer } from "./hooks/useSpotifyPlayer";
+import { usePlaybackPoller } from "./hooks/usePlaybackPoller";
 import { PluginSystem } from "./plugins/PluginSystem";
 import Layout from "./components/Layout";
 import LoginPage from "./pages/Login";
@@ -20,6 +21,7 @@ export default function App() {
   const { isAuthenticated, isPremium, setAuth } = useStore();
   useTheme();
   useSpotifyPlayer();
+  usePlaybackPoller();
 
   useEffect(() => {
     auth.getMe().then((data) => {

@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import { NavLink, useNavigate } from "react-router-dom";
 import {
   Home,
@@ -9,6 +9,8 @@ import {
   LogOut,
   Music,
   Plus,
+  Check,
+  X,
 } from "lucide-react";
 import { useStore } from "../store/useStore";
 import { spotify, auth } from "../api/client";
@@ -26,6 +28,10 @@ export default function Sidebar() {
   const { user, setAuth } = useStore();
   const navigate = useNavigate();
   const [playlists, setPlaylists] = useState<SpotifyPlaylist[]>([]);
+  const [creating, setCreating] = useState(false);
+  const [newName, setNewName] = useState("");
+  const [saving, setSaving] = useState(false);
+  const inputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     spotify.getPlaylists()
@@ -33,9 +39,36 @@ export default function Sidebar() {
       .catch(() => {});
   }, []);
 
+  useEffect(() => {
+    if (creating) {
+      setTimeout(() => inputRef.current?.focus(), 50);
+    }
+  }, [creating]);
+
   async function handleLogout() {
     await auth.logout();
     setAuth(null, false);
+  }
+
+  async function createPlaylist() {
+    if (!newName.trim() || !user) return;
+    setSaving(true);
+    try {
+      const pl = await spotify.createPlaylist(user.id, newName.trim());
+      setPlaylists((prev) => [pl, ...prev]);
+      navigate(`/playlist/${pl.id}`);
+      setCreating(false);
+      setNewName("");
+    } catch {
+      // ignore
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  function cancelCreate() {
+    setCreating(false);
+    setNewName("");
   }
 
   return (
@@ -93,10 +126,71 @@ export default function Sidebar() {
           }}
         >
           Playlists
-          <button className="btn-ghost" style={{ padding: 4, borderRadius: 4 }} title="Create playlist">
+          <button
+            className="btn-ghost"
+            style={{ padding: 4, borderRadius: 4 }}
+            title="Create playlist"
+            onClick={() => setCreating(true)}
+          >
             <Plus size={16} />
           </button>
         </div>
+
+        {/* Inline create form */}
+        {creating && (
+          <div style={{ padding: "4px 8px 8px" }}>
+            <input
+              ref={inputRef}
+              value={newName}
+              onChange={(e) => setNewName(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") createPlaylist();
+                if (e.key === "Escape") cancelCreate();
+              }}
+              placeholder="Playlist name"
+              style={{ fontSize: 13, padding: "6px 10px", marginBottom: 6 }}
+            />
+            <div style={{ display: "flex", gap: 6 }}>
+              <button
+                onClick={createPlaylist}
+                disabled={saving || !newName.trim()}
+                style={{
+                  flex: 1,
+                  padding: "5px 0",
+                  borderRadius: 4,
+                  border: "none",
+                  background: "var(--accent)",
+                  color: "#000",
+                  fontWeight: 600,
+                  fontSize: 12,
+                  cursor: saving ? "not-allowed" : "pointer",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  gap: 4,
+                  opacity: saving || !newName.trim() ? 0.5 : 1,
+                }}
+              >
+                <Check size={13} /> Create
+              </button>
+              <button
+                onClick={cancelCreate}
+                style={{
+                  padding: "5px 8px",
+                  borderRadius: 4,
+                  border: "none",
+                  background: "var(--bg-tertiary)",
+                  color: "var(--text-secondary)",
+                  cursor: "pointer",
+                  display: "flex",
+                  alignItems: "center",
+                }}
+              >
+                <X size={13} />
+              </button>
+            </div>
+          </div>
+        )}
 
         <div style={{ overflowY: "auto", flex: 1 }}>
           {playlists.map((pl) => (
@@ -119,12 +213,8 @@ export default function Sidebar() {
                 textOverflow: "ellipsis",
                 whiteSpace: "nowrap",
               }}
-              onMouseEnter={(e) =>
-                (e.currentTarget.style.color = "var(--text-primary)")
-              }
-              onMouseLeave={(e) =>
-                (e.currentTarget.style.color = "var(--text-secondary)")
-              }
+              onMouseEnter={(e) => (e.currentTarget.style.color = "var(--text-primary)")}
+              onMouseLeave={(e) => (e.currentTarget.style.color = "var(--text-secondary)")}
             >
               {pl.name}
             </button>
@@ -151,13 +241,9 @@ export default function Sidebar() {
         ) : (
           <div
             style={{
-              width: 32,
-              height: 32,
-              borderRadius: "50%",
+              width: 32, height: 32, borderRadius: "50%",
               background: "var(--bg-elevated)",
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
+              display: "flex", alignItems: "center", justifyContent: "center",
             }}
           >
             <span style={{ fontSize: 14, color: "var(--text-secondary)" }}>

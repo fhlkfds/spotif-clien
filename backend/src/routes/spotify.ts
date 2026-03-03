@@ -343,3 +343,21 @@ spotifyRouter.get("/devices", async (req: Request, res: Response) => {
 spotifyRouter.get("/sdk-token", (req: Request, res: Response) => {
   res.json({ token: req.session.accessToken });
 });
+
+// Create playlist
+spotifyRouter.post("/users/:userId/playlists", async (req: Request, res: Response) => {
+  try {
+    const { name, description, public: isPublic } = req.body;
+    const data = await spotifyFetch(
+      req.session.accessToken!,
+      `/users/${req.params.userId}/playlists`,
+      {
+        method: "POST",
+        body: JSON.stringify({ name, description, public: isPublic }),
+      }
+    );
+    res.json(data);
+  } catch (err: unknown) {
+    res.status(500).json({ error: String(err) });
+  }
+});
