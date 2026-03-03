@@ -15,6 +15,7 @@ export interface SpotifyArtist {
 export interface SpotifyAlbum {
   id: string;
   name: string;
+  uri: string;
   images: SpotifyImage[];
   artists: SpotifyArtist[];
   release_date: string;

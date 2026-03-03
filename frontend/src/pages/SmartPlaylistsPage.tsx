@@ -41,7 +41,7 @@ export default function SmartPlaylistsPage() {
     setRules((prev) => [...prev, { field: "play_count", op: "lt", value: 5 } as SmartPlaylistRule]);
   }
 
-  function updateRule(idx: number, patch: Partial<SmartPlaylistRule>) {
+  function updateRule(idx: number, patch: { field?: RuleField; op?: RuleOp; value?: number | boolean }) {
     setRules((prev) => prev.map((r, i) => i === idx ? { ...r, ...patch } as SmartPlaylistRule : r));
   }
 
