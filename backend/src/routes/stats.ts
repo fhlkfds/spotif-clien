@@ -182,6 +182,71 @@ statsRouter.get("/streaks", async (req: Request, res: Response) => {
   }
 });
 
+// Skip analysis
+statsRouter.get("/skips", async (req: Request, res: Response) => {
+  try {
+    const { period = "all" } = req.query;
+    const interval = periodToInterval(period as string);
+    const userId = req.session.userId;
+
+    const [totals, topSkipped] = await Promise.all([
+      pool.query(
+        `SELECT
+           COUNT(*) FILTER (WHERE skipped = true) as skip_count,
+           COUNT(*) as total_plays
+         FROM listen_history WHERE user_id=$1 ${interval}`,
+        [userId]
+      ),
+      pool.query(
+        `SELECT track_id, track_name, artist_name, album_art,
+                COUNT(*) as skip_count
+         FROM listen_history
+         WHERE user_id=$1 AND skipped=true ${interval}
+         GROUP BY track_id, track_name, artist_name, album_art
+         ORDER BY skip_count DESC
+         LIMIT 5`,
+        [userId]
+      ),
+    ]);
+
+    const t = totals.rows[0];
+    const skipCount = Number(t.skip_count);
+    const totalPlays = Number(t.total_plays);
+    res.json({
+      skipCount,
+      totalPlays,
+      skipRate: totalPlays > 0 ? Math.round((skipCount / totalPlays) * 100) : 0,
+      topSkipped: topSkipped.rows,
+    });
+  } catch (err: unknown) {
+    res.status(500).json({ error: String(err) });
+  }
+});
+
+// Sessions
+statsRouter.get("/sessions", async (req: Request, res: Response) => {
+  try {
+    const { rows } = await pool.query(
+      `SELECT
+         session_id,
+         MIN(played_at) as started_at,
+         MAX(played_at) as ended_at,
+         COUNT(*) as track_count,
+         COUNT(*) FILTER (WHERE skipped=true) as skip_count,
+         EXTRACT(EPOCH FROM (MAX(played_at) - MIN(played_at))) as duration_secs
+       FROM listen_history
+       WHERE user_id=$1 AND session_id IS NOT NULL
+       GROUP BY session_id
+       ORDER BY started_at DESC
+       LIMIT 20`,
+      [req.session.userId]
+    );
+    res.json(rows);
+  } catch (err: unknown) {
+    res.status(500).json({ error: String(err) });
+  }
+});
+
 function periodToInterval(period: string): string {
   switch (period) {
     case "day":

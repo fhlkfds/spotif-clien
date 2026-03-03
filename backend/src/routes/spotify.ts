@@ -175,22 +175,25 @@ spotifyRouter.post("/player/transfer", async (req: Request, res: Response) => {
   }
 });
 
-// Log play for stats
+// Log play for stats (enhanced with skip/crossfade/session)
 spotifyRouter.post("/player/log", async (req: Request, res: Response) => {
   try {
-    const { track_id, track_name, artist_name, album_name, album_art, duration_ms } =
-      req.body;
+    const {
+      track_id, track_name, artist_name, album_name, album_art, duration_ms,
+      skipped, play_duration_ms, crossfaded, session_id,
+    } = req.body;
     await pool.query(
-      `INSERT INTO listen_history (track_id, track_name, artist_name, album_name, album_art, duration_ms, user_id)
-       VALUES ($1, $2, $3, $4, $5, $6, $7)`,
+      `INSERT INTO listen_history
+         (track_id, track_name, artist_name, album_name, album_art, duration_ms, user_id,
+          skipped, play_duration_ms, crossfaded, session_id)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)`,
       [
-        track_id,
-        track_name,
-        artist_name,
-        album_name,
-        album_art,
-        duration_ms,
+        track_id, track_name, artist_name, album_name, album_art, duration_ms,
         req.session.userId,
+        skipped ?? false,
+        play_duration_ms ?? null,
+        crossfaded ?? false,
+        session_id ?? null,
       ]
     );
     res.json({ success: true });
@@ -388,6 +391,119 @@ spotifyRouter.delete("/me/tracks", async (req: Request, res: Response) => {
       body: JSON.stringify({ ids: req.body.ids }),
     });
     res.json({ success: true });
+  } catch (err: unknown) {
+    res.status(errStatus(err)).json({ error: String(err) });
+  }
+});
+
+// Queue
+spotifyRouter.get("/queue", async (req: Request, res: Response) => {
+  try {
+    const data = await spotifyFetch(req.session.accessToken!, "/me/player/queue");
+    res.json(data);
+  } catch (err: unknown) {
+    res.status(errStatus(err)).json({ error: String(err) });
+  }
+});
+
+spotifyRouter.post("/queue", async (req: Request, res: Response) => {
+  try {
+    const { uri } = req.body;
+    await spotifyFetch(
+      req.session.accessToken!,
+      `/me/player/queue?uri=${encodeURIComponent(uri)}`,
+      { method: "POST" }
+    );
+    res.json({ success: true });
+  } catch (err: unknown) {
+    res.status(errStatus(err)).json({ error: String(err) });
+  }
+});
+
+// Browse
+spotifyRouter.get("/browse/new-releases", async (req: Request, res: Response) => {
+  try {
+    const { limit = 20, offset = 0 } = req.query;
+    const data = await spotifyFetch(
+      req.session.accessToken!,
+      `/browse/new-releases?limit=${limit}&offset=${offset}`
+    );
+    res.json(data);
+  } catch (err: unknown) {
+    res.status(errStatus(err)).json({ error: String(err) });
+  }
+});
+
+spotifyRouter.get("/browse/categories", async (req: Request, res: Response) => {
+  try {
+    const data = await spotifyFetch(req.session.accessToken!, "/browse/categories");
+    res.json(data);
+  } catch (err: unknown) {
+    res.status(errStatus(err)).json({ error: String(err) });
+  }
+});
+
+// Enhanced artist endpoints
+spotifyRouter.get("/artists/:id/albums", async (req: Request, res: Response) => {
+  try {
+    const { include_groups = "album,single,appears_on", limit = 50 } = req.query;
+    const data = await spotifyFetch(
+      req.session.accessToken!,
+      `/artists/${req.params.id}/albums?include_groups=${include_groups}&limit=${limit}&market=US`
+    );
+    res.json(data);
+  } catch (err: unknown) {
+    res.status(errStatus(err)).json({ error: String(err) });
+  }
+});
+
+spotifyRouter.get("/artists/:id/related", async (req: Request, res: Response) => {
+  try {
+    const data = await spotifyFetch(
+      req.session.accessToken!,
+      `/artists/${req.params.id}/related-artists`
+    );
+    res.json(data);
+  } catch (err: unknown) {
+    res.status(errStatus(err)).json({ error: String(err) });
+  }
+});
+
+// Single track
+spotifyRouter.get("/tracks/:id", async (req: Request, res: Response) => {
+  try {
+    const data = await spotifyFetch(req.session.accessToken!, `/tracks/${req.params.id}`);
+    res.json(data);
+  } catch (err: unknown) {
+    res.status(errStatus(err)).json({ error: String(err) });
+  }
+});
+
+// Playlist track management
+spotifyRouter.post("/playlists/:id/tracks", async (req: Request, res: Response) => {
+  try {
+    const { uris } = req.body;
+    const data = await spotifyFetch(
+      req.session.accessToken!,
+      `/playlists/${req.params.id}/tracks`,
+      { method: "POST", body: JSON.stringify({ uris }) }
+    );
+    res.json(data);
+  } catch (err: unknown) {
+    res.status(errStatus(err)).json({ error: String(err) });
+  }
+});
+
+spotifyRouter.delete("/playlists/:id/tracks", async (req: Request, res: Response) => {
+  try {
+    const { uris } = req.body;
+    const tracks = (uris as string[]).map((uri) => ({ uri }));
+    const data = await spotifyFetch(
+      req.session.accessToken!,
+      `/playlists/${req.params.id}/tracks`,
+      { method: "DELETE", body: JSON.stringify({ tracks }) }
+    );
+    res.json(data);
   } catch (err: unknown) {
     res.status(errStatus(err)).json({ error: String(err) });
   }

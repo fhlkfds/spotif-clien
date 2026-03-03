@@ -1,4 +1,5 @@
 import axios from "axios";
+import type { LyricsData, Bookmark, OfflineTrack } from "../types";
 
 const api = axios.create({
   baseURL: "/api",
@@ -34,6 +35,10 @@ export const spotify = {
     album_name?: string;
     album_art?: string;
     duration_ms?: number;
+    skipped?: boolean;
+    play_duration_ms?: number;
+    crossfaded?: boolean;
+    session_id?: string;
   }) => api.post("/spotify/player/log", track),
 
   getPlaylists: () => api.get("/spotify/me/playlists").then((r) => r.data),
@@ -64,6 +69,20 @@ export const spotify = {
   removeTrack: (id: string) => api.delete("/spotify/me/tracks", { data: { ids: [id] } }),
 
   getDevices: () => api.get("/spotify/devices").then((r) => r.data),
+
+  getQueue: () => api.get("/spotify/queue").then((r) => r.data),
+  addToQueue: (uri: string) => api.post("/spotify/queue", { uri }),
+  getNewReleases: (limit = 20, offset = 0) =>
+    api.get("/spotify/browse/new-releases", { params: { limit, offset } }).then((r) => r.data),
+  getArtistAlbums: (id: string) =>
+    api.get(`/spotify/artists/${id}/albums`).then((r) => r.data),
+  getRelatedArtists: (id: string) =>
+    api.get(`/spotify/artists/${id}/related`).then((r) => r.data),
+  getTrack: (id: string) => api.get(`/spotify/tracks/${id}`).then((r) => r.data),
+  addToPlaylist: (playlistId: string, uris: string[]) =>
+    api.post(`/spotify/playlists/${playlistId}/tracks`, { uris }),
+  removeFromPlaylist: (playlistId: string, uris: string[]) =>
+    api.delete(`/spotify/playlists/${playlistId}/tracks`, { data: { uris } }),
 };
 
 export const auth = {
@@ -116,6 +135,52 @@ export const plugins = {
   updateConfig: (name: string, config: object) =>
     api.put(`/plugins/${name}/config`, { config }),
   bundleUrl: (name: string) => `/api/plugins/${name}/bundle.js`,
+};
+
+export const queue = {
+  get: () => api.get("/spotify/queue").then((r) => r.data),
+  add: (uri: string) => api.post("/spotify/queue", { uri }),
+};
+
+export const lyrics = {
+  get: (track_id: string, artist: string, title: string) =>
+    api.get("/lyrics", { params: { track_id, artist, title } }).then((r) => r.data as LyricsData),
+};
+
+export const bookmarks = {
+  list: (type?: string) =>
+    api.get("/bookmarks", { params: type ? { type } : {} }).then((r) => r.data as Bookmark[]),
+  add: (b: Omit<Bookmark, "id" | "created_at">) => api.post("/bookmarks", b),
+  remove: (type: string, itemId: string) => api.delete(`/bookmarks/${type}/${itemId}`),
+  check: (type: string, itemId: string) =>
+    api.get(`/bookmarks/${type}/${itemId}/check`).then((r) => r.data.bookmarked as boolean),
+};
+
+export const lastfm = {
+  artistTags: (name: string) =>
+    api.get(`/lastfm/artist/${encodeURIComponent(name)}/tags`).then((r) => r.data),
+  similarArtists: (name: string) =>
+    api.get(`/lastfm/artist/${encodeURIComponent(name)}/similar`).then((r) => r.data),
+  trackTags: (artist: string, track: string) =>
+    api.get(`/lastfm/track/${encodeURIComponent(artist)}/${encodeURIComponent(track)}/tags`).then((r) => r.data),
+  trackSimilar: (artist: string, track: string) =>
+    api.get(`/lastfm/track/${encodeURIComponent(artist)}/${encodeURIComponent(track)}/similar`).then((r) => r.data),
+  albumTags: (artist: string, album: string) =>
+    api.get(`/lastfm/album/${encodeURIComponent(artist)}/${encodeURIComponent(album)}/tags`).then((r) => r.data),
+  tagArtists: (tag: string, page = 1) =>
+    api.get(`/lastfm/tag/${encodeURIComponent(tag)}/artists`, { params: { page } }).then((r) => r.data),
+  tagAlbums: (tag: string, page = 1) =>
+    api.get(`/lastfm/tag/${encodeURIComponent(tag)}/albums`, { params: { page } }).then((r) => r.data),
+  tagTracks: (tag: string, page = 1) =>
+    api.get(`/lastfm/tag/${encodeURIComponent(tag)}/tracks`, { params: { page } }).then((r) => r.data),
+  geoTopArtists: (country: string) =>
+    api.get("/lastfm/geo/top-artists", { params: { country } }).then((r) => r.data),
+  geoTopTracks: (country: string) =>
+    api.get("/lastfm/geo/top-tracks", { params: { country } }).then((r) => r.data),
+};
+
+export const offline = {
+  list: () => api.get("/offline/tracks").then((r) => r.data as OfflineTrack[]),
 };
 
 export default api;

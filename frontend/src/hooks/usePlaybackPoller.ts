@@ -5,14 +5,27 @@ import { PluginSystem } from "../plugins/PluginSystem";
 
 const POLL_MS = 3000;
 
+interface PrevTrack {
+  id: string;
+  progress_ms: number;
+  duration_ms: number;
+  startedAt: number;
+}
+
 /**
  * Polls the Spotify API for current playback state.
- * This ensures the player bar always reflects what's playing,
- * regardless of which device (browser SDK, phone, desktop app, etc).
+ * Detects skips and crossfades by tracking previous track progress.
  */
 export function usePlaybackPoller() {
-  const { isAuthenticated, setPlaybackState, playbackState } = useStore();
+  const {
+    isAuthenticated,
+    setPlaybackState,
+    sessionId,
+    incrementSessionTrackCount,
+    incrementSessionLoops,
+  } = useStore();
   const prevTrackId = useRef<string | null>(null);
+  const prevTrack = useRef<PrevTrack | null>(null);
 
   useEffect(() => {
     if (!isAuthenticated) return;
@@ -23,28 +36,76 @@ export function usePlaybackPoller() {
       if (cancelled) return;
       try {
         const state = await spotify.getPlayer();
-        if (!cancelled) {
-          setPlaybackState(state ?? null);
+        if (cancelled) return;
 
-          // Emit plugin event on track change
-          const newTrackId = state?.item?.id ?? null;
-          if (newTrackId && newTrackId !== prevTrackId.current) {
-            prevTrackId.current = newTrackId;
-            PluginSystem.emit("track:change", state.item);
-            PluginSystem.updatePlayerState(state.item, state);
+        setPlaybackState(state ?? null);
+
+        const newTrackId = state?.item?.id ?? null;
+
+        if (newTrackId && newTrackId !== prevTrackId.current) {
+          const now = Date.now();
+          const prev = prevTrack.current;
+
+          // Detect skip / crossfade from previous track
+          if (prev && prev.id !== newTrackId) {
+            const playDuration = now - prev.startedAt;
+            const pctPlayed = prev.duration_ms > 0
+              ? prev.progress_ms / prev.duration_ms
+              : 1;
+
+            const skipped =
+              pctPlayed < 0.80 &&
+              playDuration < prev.duration_ms * 0.80;
+
+            const crossfaded =
+              pctPlayed > 0.88 &&
+              (prev.duration_ms - prev.progress_ms) < 12_000;
+
+            // Log previous track play
+            if (prev.id) {
+              spotify.logPlay({
+                track_id: prev.id,
+                track_name: state?.item?.name ?? "",
+                artist_name: "",
+                skipped,
+                crossfaded,
+                play_duration_ms: playDuration,
+                session_id: sessionId,
+              }).catch(() => {});
+            }
           }
+
+          // Detect loop (same track ID two consecutive polls)
+          if (prevTrackId.current === newTrackId) {
+            incrementSessionLoops();
+          } else {
+            incrementSessionTrackCount();
+          }
+
+          prevTrackId.current = newTrackId;
+          prevTrack.current = {
+            id: newTrackId,
+            progress_ms: state?.progress_ms ?? 0,
+            duration_ms: state?.item?.duration_ms ?? 0,
+            startedAt: now,
+          };
+
+          PluginSystem.emit("track:change", state.item);
+          PluginSystem.updatePlayerState(state.item, state);
+        } else if (newTrackId && prevTrack.current) {
+          // Update progress for skip detection accuracy
+          prevTrack.current.progress_ms = state?.progress_ms ?? prevTrack.current.progress_ms;
         }
       } catch {
         // ignore transient errors
       }
     }
 
-    // Poll immediately then on interval
     poll();
     const id = setInterval(poll, POLL_MS);
     return () => {
       cancelled = true;
       clearInterval(id);
     };
-  }, [isAuthenticated, setPlaybackState]);
+  }, [isAuthenticated, setPlaybackState, sessionId, incrementSessionTrackCount, incrementSessionLoops]);
 }

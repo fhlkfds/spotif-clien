@@ -1,20 +1,25 @@
 import { useEffect, useState, useRef } from "react";
-import { Palette, Puzzle, Download as DownloadIcon, Trash2, RefreshCw, Check } from "lucide-react";
-import { themes, plugins as pluginsApi, downloads as downloadsApi } from "../api/client";
+import { Palette, Puzzle, Download as DownloadIcon, Trash2, RefreshCw, Check, Radio, Play } from "lucide-react";
+import { themes, plugins as pluginsApi, downloads as downloadsApi, offline as offlineApi } from "../api/client";
 import { useTheme } from "../hooks/useTheme";
 import { PluginSystem } from "../plugins/PluginSystem";
-import type { ThemeInfo, PluginInfo, Download } from "../types";
+import { useStore } from "../store/useStore";
+import type { ThemeInfo, PluginInfo, Download, OfflineTrack } from "../types";
 
 type Section = "themes" | "plugins" | "downloads";
 
 export default function Settings() {
   const [section, setSection] = useState<Section>("themes");
   const { currentTheme, changeTheme } = useTheme();
+  const { setOfflineTrack } = useStore();
 
   // Themes
   const [themeList, setThemeList] = useState<ThemeInfo[]>([]);
   const [customCss, setCustomCss] = useState("");
   const [showCssEditor, setShowCssEditor] = useState(false);
+  const [bgImageUrl, setBgImageUrl] = useState(() => localStorage.getItem("bg-image") ?? "");
+  const [bgOpacity, setBgOpacity] = useState(() => Number(localStorage.getItem("bg-opacity") ?? "0.3"));
+  const [bgBlur, setBgBlur] = useState(() => Number(localStorage.getItem("bg-blur") ?? "0"));
 
   // Plugins
   const [availablePlugins, setAvailablePlugins] = useState<PluginInfo[]>([]);
@@ -22,6 +27,7 @@ export default function Settings() {
 
   // Downloads
   const [downloadList, setDownloadList] = useState<Download[]>([]);
+  const [offlineTracks, setOfflineTracks] = useState<OfflineTrack[]>([]);
 
   useEffect(() => {
     themes.list().then(setThemeList).catch(() => {});
@@ -29,6 +35,22 @@ export default function Settings() {
       if (d.custom_css) setCustomCss(d.custom_css);
     }).catch(() => {});
   }, []);
+
+  // Apply background image settings
+  useEffect(() => {
+    const root = document.documentElement;
+    if (bgImageUrl) {
+      root.style.setProperty("--bg-image", `url(${bgImageUrl})`);
+      root.style.setProperty("--bg-opacity", String(bgOpacity));
+      root.style.setProperty("--bg-blur", `${bgBlur}px`);
+      localStorage.setItem("bg-image", bgImageUrl);
+      localStorage.setItem("bg-opacity", String(bgOpacity));
+      localStorage.setItem("bg-blur", String(bgBlur));
+    } else {
+      root.style.removeProperty("--bg-image");
+      localStorage.removeItem("bg-image");
+    }
+  }, [bgImageUrl, bgOpacity, bgBlur]);
 
   useEffect(() => {
     if (section === "plugins") {
@@ -39,6 +61,7 @@ export default function Settings() {
     }
     if (section === "downloads") {
       downloadsApi.list().then(setDownloadList).catch(() => {});
+      offlineApi.list().then(setOfflineTracks).catch(() => {});
     }
   }, [section]);
 
@@ -48,7 +71,6 @@ export default function Settings() {
 
   async function saveCustomCss() {
     await themes.setCurrent(currentTheme, customCss);
-    // Inject into page
     let el = document.getElementById("custom-css") as HTMLStyleElement | null;
     if (!el) {
       el = document.createElement("style");
@@ -77,6 +99,7 @@ export default function Settings() {
   async function deleteDownload(id: number) {
     await downloadsApi.delete(id);
     setDownloadList((prev) => prev.filter((d) => d.id !== id));
+    setOfflineTracks((prev) => prev.filter((d) => d.id !== id));
   }
 
   const SECTIONS: { key: Section; label: string; icon: typeof Palette }[] = [
@@ -189,6 +212,65 @@ export default function Settings() {
               ))}
             </div>
 
+            {/* Background image */}
+            <div
+              style={{
+                background: "var(--bg-secondary)",
+                borderRadius: 10,
+                padding: 20,
+                border: "1px solid var(--border)",
+                marginBottom: 16,
+              }}
+            >
+              <h3 style={{ fontWeight: 700, marginBottom: 12 }}>Background Image</h3>
+              <div style={{ display: "flex", gap: 8, marginBottom: 12 }}>
+                <input
+                  type="text"
+                  placeholder="Paste image URL (https://...)"
+                  value={bgImageUrl}
+                  onChange={(e) => setBgImageUrl(e.target.value)}
+                  style={{ flex: 1, fontSize: 13 }}
+                />
+                {bgImageUrl && (
+                  <button
+                    className="btn btn-secondary"
+                    onClick={() => setBgImageUrl("")}
+                    style={{ fontSize: 13 }}
+                  >
+                    Clear
+                  </button>
+                )}
+              </div>
+              {bgImageUrl && (
+                <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+                  <label style={{ fontSize: 13, color: "var(--text-secondary)" }}>
+                    Opacity: {Math.round(bgOpacity * 100)}%
+                    <input
+                      type="range"
+                      min={0}
+                      max={1}
+                      step={0.05}
+                      value={bgOpacity}
+                      onChange={(e) => setBgOpacity(Number(e.target.value))}
+                      style={{ display: "block", width: "100%", marginTop: 6, accentColor: "var(--accent)" }}
+                    />
+                  </label>
+                  <label style={{ fontSize: 13, color: "var(--text-secondary)" }}>
+                    Blur: {bgBlur}px
+                    <input
+                      type="range"
+                      min={0}
+                      max={20}
+                      step={1}
+                      value={bgBlur}
+                      onChange={(e) => setBgBlur(Number(e.target.value))}
+                      style={{ display: "block", width: "100%", marginTop: 6, accentColor: "var(--accent)" }}
+                    />
+                  </label>
+                </div>
+              )}
+            </div>
+
             {/* Custom CSS editor */}
             <div
               style={{
@@ -196,6 +278,7 @@ export default function Settings() {
                 borderRadius: 10,
                 padding: 20,
                 border: "1px solid var(--border)",
+                marginBottom: 16,
               }}
             >
               <div
@@ -234,6 +317,39 @@ export default function Settings() {
                   </div>
                 </>
               )}
+            </div>
+
+            {/* Last.fm info */}
+            <div
+              style={{
+                background: "var(--bg-secondary)",
+                borderRadius: 10,
+                padding: 20,
+                border: "1px solid var(--border)",
+              }}
+            >
+              <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 8 }}>
+                <Radio size={18} color="var(--accent)" />
+                <h3 style={{ fontWeight: 700 }}>Last.fm Integration</h3>
+              </div>
+              <p className="text-secondary" style={{ fontSize: 13, marginBottom: 8 }}>
+                Last.fm tags and similar artist data require an API key configured in your{" "}
+                <code style={{ background: "var(--bg-tertiary)", padding: "2px 6px", borderRadius: 4 }}>
+                  .env
+                </code>{" "}
+                file as <code style={{ background: "var(--bg-tertiary)", padding: "2px 6px", borderRadius: 4 }}>
+                  LASTFM_API_KEY
+                </code>.
+              </p>
+              <a
+                href="https://www.last.fm/api/account/create"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="btn btn-secondary"
+                style={{ fontSize: 13, display: "inline-flex" }}
+              >
+                Get Last.fm API Key ↗
+              </a>
             </div>
           </div>
         )}
@@ -328,7 +444,10 @@ export default function Settings() {
               <h2 style={{ fontSize: 20, fontWeight: 700 }}>Downloads</h2>
               <button
                 className="btn-ghost"
-                onClick={() => downloadsApi.list().then(setDownloadList).catch(() => {})}
+                onClick={() => {
+                  downloadsApi.list().then(setDownloadList).catch(() => {});
+                  offlineApi.list().then(setOfflineTracks).catch(() => {});
+                }}
               >
                 <RefreshCw size={16} />
               </button>
@@ -339,6 +458,65 @@ export default function Settings() {
               button on any track in the player.
             </p>
 
+            {/* Offline tracks (completed) */}
+            {offlineTracks.length > 0 && (
+              <div style={{ marginBottom: 24 }}>
+                <h3 style={{ fontWeight: 700, fontSize: 15, marginBottom: 12 }}>
+                  Available Offline ({offlineTracks.length})
+                </h3>
+                <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                  {offlineTracks.map((dl) => (
+                    <div
+                      key={dl.id}
+                      style={{
+                        background: "var(--bg-secondary)",
+                        border: "1px solid var(--accent)",
+                        borderRadius: 8,
+                        padding: "12px 16px",
+                        display: "flex",
+                        alignItems: "center",
+                        gap: 16,
+                      }}
+                    >
+                      <div style={{ flex: 1, minWidth: 0 }}>
+                        <div className="truncate" style={{ fontWeight: 600, fontSize: 14 }}>
+                          {dl.track_name}
+                        </div>
+                        <div className="text-secondary" style={{ fontSize: 12 }}>
+                          {dl.artist_name} · {dl.format.toUpperCase()}
+                          {dl.file_size && ` · ${(dl.file_size / 1_048_576).toFixed(1)} MB`}
+                        </div>
+                      </div>
+                      <button
+                        className="btn btn-primary"
+                        style={{ padding: "6px 12px", fontSize: 13, display: "flex", alignItems: "center", gap: 6 }}
+                        onClick={() => setOfflineTrack(dl.file_url)}
+                        title="Play offline"
+                      >
+                        <Play size={14} fill="currentColor" color="#000" /> Play
+                      </button>
+                      <a
+                        href={downloadsApi.fileUrl(dl.id)}
+                        className="btn btn-secondary"
+                        style={{ padding: "6px 12px", fontSize: 13 }}
+                      >
+                        Save
+                      </a>
+                      <button
+                        className="btn-ghost"
+                        onClick={() => deleteDownload(dl.id)}
+                        style={{ color: "var(--danger)" }}
+                      >
+                        <Trash2 size={16} />
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* All downloads */}
+            <h3 style={{ fontWeight: 700, fontSize: 15, marginBottom: 12 }}>All Downloads</h3>
             {downloadList.length === 0 ? (
               <div
                 style={{

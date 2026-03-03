@@ -4,6 +4,8 @@ import { Play, Shuffle } from "lucide-react";
 import { spotify } from "../api/client";
 import { useStore } from "../store/useStore";
 import TrackList from "../components/TrackList";
+import BookmarkButton from "../components/BookmarkButton";
+import ShareMenu from "../components/ShareMenu";
 import type { SpotifyPlaylist, SpotifyTrack } from "../types";
 
 export default function PlaylistView() {
@@ -80,7 +82,7 @@ export default function PlaylistView() {
       </div>
 
       {/* Controls */}
-      <div style={{ padding: "16px 24px", display: "flex", gap: 16, alignItems: "center" }}>
+      <div style={{ padding: "16px 24px", display: "flex", gap: 12, alignItems: "center" }}>
         <button
           className="btn btn-primary"
           style={{ borderRadius: "50%", width: 56, height: 56, padding: 0, justifyContent: "center" }}
@@ -102,6 +104,17 @@ export default function PlaylistView() {
         >
           <Shuffle size={22} />
         </button>
+        <BookmarkButton
+          type="playlist"
+          item_id={playlist.id}
+          item_name={playlist.name}
+          item_uri={`spotify:playlist:${playlist.id}`}
+        />
+        <ShareMenu
+          name={playlist.name}
+          spotifyUri={`spotify:playlist:${playlist.id}`}
+          spotifyUrl={`https://open.spotify.com/playlist/${playlist.id}`}
+        />
       </div>
 
       <div style={{ padding: "0 24px 100px" }}>

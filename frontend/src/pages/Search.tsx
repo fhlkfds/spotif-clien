@@ -4,6 +4,7 @@ import { Search as SearchIcon } from "lucide-react";
 import { spotify } from "../api/client";
 import { useStore } from "../store/useStore";
 import TrackList from "../components/TrackList";
+import ExternalLinks from "../components/ExternalLinks";
 import type { SpotifyTrack, SpotifyAlbum, SpotifyArtist, SpotifyPlaylist } from "../types";
 
 interface SearchResults {
@@ -17,6 +18,7 @@ export default function Search() {
   const { deviceId } = useStore();
   const navigate = useNavigate();
   const [query, setQuery] = useState("");
+  const [submittedQuery, setSubmittedQuery] = useState("");
   const [results, setResults] = useState<SearchResults | null>(null);
   const [tab, setTab] = useState<"tracks" | "albums" | "artists" | "playlists">("tracks");
   const [loading, setLoading] = useState(false);
@@ -25,9 +27,11 @@ export default function Search() {
     async (q: string) => {
       if (!q.trim()) {
         setResults(null);
+        setSubmittedQuery("");
         return;
       }
       setLoading(true);
+      setSubmittedQuery(q.trim());
       try {
         const data = await spotify.search(q);
         setResults(data);
@@ -45,7 +49,7 @@ export default function Search() {
       <h1 style={{ fontSize: 28, fontWeight: 700, marginBottom: 24 }}>Search</h1>
 
       {/* Search input */}
-      <div style={{ position: "relative", maxWidth: 480, marginBottom: 32 }}>
+      <div style={{ position: "relative", maxWidth: 480, marginBottom: 24 }}>
         <SearchIcon
           size={18}
           style={{
@@ -86,6 +90,13 @@ export default function Search() {
           Search
         </button>
       </div>
+
+      {/* External links shown after search */}
+      {submittedQuery && (
+        <div style={{ marginBottom: 24 }}>
+          <ExternalLinks query={submittedQuery} />
+        </div>
+      )}
 
       {loading && (
         <div style={{ display: "flex", justifyContent: "center", padding: 40 }}>

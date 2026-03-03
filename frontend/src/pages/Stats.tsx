@@ -12,7 +12,8 @@ import {
 } from "recharts";
 import { stats } from "../api/client";
 import type { StatsOverview, TopTrack, TopArtist, ActivityDay } from "../types";
-import { Flame, Clock, Music, Users } from "lucide-react";
+import { Flame, Clock, Music, Users, SkipForward } from "lucide-react";
+import SessionStatsBar from "../components/SessionStatsBar";
 
 type Period = "day" | "week" | "month" | "year" | "all";
 
@@ -24,6 +25,22 @@ const PERIODS: { value: Period; label: string }[] = [
   { value: "all", label: "All time" },
 ];
 
+interface SkipStats {
+  skipCount: number;
+  totalPlays: number;
+  skipRate: number;
+  topSkipped: TopTrack[];
+}
+
+interface SessionRow {
+  session_id: string;
+  started_at: string;
+  ended_at: string;
+  track_count: string;
+  skip_count: string;
+  duration_secs: string;
+}
+
 export default function Stats() {
   const [overview, setOverview] = useState<StatsOverview | null>(null);
   const [topTracks, setTopTracks] = useState<TopTrack[]>([]);
@@ -31,9 +48,11 @@ export default function Stats() {
   const [activity, setActivity] = useState<ActivityDay[]>([]);
   const [byHour, setByHour] = useState<{ hour: string; plays: string }[]>([]);
   const [streaks, setStreaks] = useState({ currentStreak: 0, longestStreak: 0 });
+  const [skipStats, setSkipStats] = useState<SkipStats | null>(null);
+  const [sessions, setSessions] = useState<SessionRow[]>([]);
   const [period, setPeriod] = useState<Period>("month");
   const [loading, setLoading] = useState(true);
-  const [tab, setTab] = useState<"overview" | "tracks" | "artists" | "activity">("overview");
+  const [tab, setTab] = useState<"overview" | "tracks" | "artists" | "activity" | "skips" | "sessions">("overview");
 
   useEffect(() => {
     setLoading(true);
@@ -44,14 +63,18 @@ export default function Stats() {
       stats.getActivity(),
       stats.getByHour(),
       stats.getStreaks(),
+      fetch(`/api/stats/skips?period=${period}`, { credentials: "include" }).then((r) => r.json()),
+      fetch("/api/stats/sessions", { credentials: "include" }).then((r) => r.json()),
     ])
-      .then(([ov, tt, ta, act, bh, st]) => {
+      .then(([ov, tt, ta, act, bh, st, sk, sess]) => {
         setOverview(ov);
         setTopTracks(tt);
         setTopArtists(ta);
         setActivity(act);
         setByHour(bh);
         setStreaks(st);
+        setSkipStats(sk);
+        setSessions(sess);
       })
       .finally(() => setLoading(false));
   }, [period]);
@@ -64,6 +87,7 @@ export default function Stats() {
         { icon: Users, label: "Unique Artists", value: overview.uniqueArtists.toLocaleString() },
         { icon: Flame, label: "Day Streak", value: `${streaks.currentStreak}d` },
         { icon: Flame, label: "Best Streak", value: `${streaks.longestStreak}d` },
+        { icon: SkipForward, label: "Skip Rate", value: skipStats ? `${skipStats.skipRate}%` : "—" },
       ]
     : [];
 
@@ -72,9 +96,11 @@ export default function Stats() {
     plays: Number(byHour.find((h) => Number(h.hour) === i)?.plays ?? 0),
   }));
 
+  const ALL_TABS = ["overview", "tracks", "artists", "activity", "skips", "sessions"] as const;
+
   return (
     <div style={{ padding: "24px 24px 100px" }}>
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 24 }}>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
         <h1 style={{ fontSize: 28, fontWeight: 700 }}>Your Stats</h1>
         <div style={{ display: "flex", gap: 8 }}>
           {PERIODS.map((p) => (
@@ -96,6 +122,11 @@ export default function Stats() {
             </button>
           ))}
         </div>
+      </div>
+
+      {/* Session stats bar */}
+      <div style={{ marginBottom: 24 }}>
+        <SessionStatsBar />
       </div>
 
       {loading ? (
@@ -131,8 +162,8 @@ export default function Stats() {
           </div>
 
           {/* Tabs */}
-          <div style={{ display: "flex", gap: 8, marginBottom: 24 }}>
-            {(["overview", "tracks", "artists", "activity"] as const).map((t) => (
+          <div style={{ display: "flex", gap: 8, marginBottom: 24, flexWrap: "wrap" }}>
+            {ALL_TABS.map((t) => (
               <button
                 key={t}
                 onClick={() => setTab(t)}
@@ -155,7 +186,6 @@ export default function Stats() {
 
           {tab === "overview" && (
             <div style={{ display: "grid", gap: 24, gridTemplateColumns: "1fr 1fr" }}>
-              {/* Plays by hour */}
               <div
                 style={{
                   background: "var(--bg-secondary)",
@@ -186,7 +216,6 @@ export default function Stats() {
                 </ResponsiveContainer>
               </div>
 
-              {/* Activity over time */}
               <div
                 style={{
                   background: "var(--bg-secondary)",
@@ -239,28 +268,16 @@ export default function Stats() {
                     borderRadius: 6,
                   }}
                 >
-                  <span className="text-muted" style={{ width: 24, fontSize: 13 }}>
-                    {i + 1}
-                  </span>
+                  <span className="text-muted" style={{ width: 24, fontSize: 13 }}>{i + 1}</span>
                   {t.album_art && (
-                    <img
-                      src={t.album_art}
-                      alt=""
-                      style={{ width: 44, height: 44, borderRadius: 4, objectFit: "cover" }}
-                    />
+                    <img src={t.album_art} alt="" style={{ width: 44, height: 44, borderRadius: 4, objectFit: "cover" }} />
                   )}
                   <div style={{ flex: 1, minWidth: 0 }}>
-                    <div className="truncate" style={{ fontWeight: 600, fontSize: 14 }}>
-                      {t.track_name}
-                    </div>
-                    <div className="truncate text-secondary" style={{ fontSize: 12 }}>
-                      {t.artist_name}
-                    </div>
+                    <div className="truncate" style={{ fontWeight: 600, fontSize: 14 }}>{t.track_name}</div>
+                    <div className="truncate text-secondary" style={{ fontSize: 12 }}>{t.artist_name}</div>
                   </div>
                   <div style={{ textAlign: "right" }}>
-                    <div style={{ fontWeight: 700, color: "var(--accent)" }}>
-                      {t.play_count}x
-                    </div>
+                    <div style={{ fontWeight: 700, color: "var(--accent)" }}>{t.play_count}x</div>
                     <div className="text-secondary" style={{ fontSize: 11 }}>
                       {Math.round(Number(t.total_ms) / 60000)} min
                     </div>
@@ -288,35 +305,23 @@ export default function Stats() {
                     borderRadius: 6,
                   }}
                 >
-                  <span className="text-muted" style={{ width: 24, fontSize: 13 }}>
-                    {i + 1}
-                  </span>
+                  <span className="text-muted" style={{ width: 24, fontSize: 13 }}>{i + 1}</span>
                   <div
                     style={{
-                      width: 44,
-                      height: 44,
-                      borderRadius: "50%",
+                      width: 44, height: 44, borderRadius: "50%",
                       background: "var(--bg-elevated)",
-                      display: "flex",
-                      alignItems: "center",
-                      justifyContent: "center",
-                      fontSize: 18,
-                      fontWeight: 700,
-                      color: "var(--accent)",
+                      display: "flex", alignItems: "center", justifyContent: "center",
+                      fontSize: 18, fontWeight: 700, color: "var(--accent)",
                     }}
                   >
                     {a.artist_name[0]}
                   </div>
                   <div style={{ flex: 1 }}>
                     <div style={{ fontWeight: 600, fontSize: 14 }}>{a.artist_name}</div>
-                    <div className="text-secondary" style={{ fontSize: 12 }}>
-                      {a.unique_tracks} tracks
-                    </div>
+                    <div className="text-secondary" style={{ fontSize: 12 }}>{a.unique_tracks} tracks</div>
                   </div>
                   <div style={{ textAlign: "right" }}>
-                    <div style={{ fontWeight: 700, color: "var(--accent)" }}>
-                      {a.play_count}x
-                    </div>
+                    <div style={{ fontWeight: 700, color: "var(--accent)" }}>{a.play_count}x</div>
                     <div className="text-secondary" style={{ fontSize: 11 }}>
                       {Math.round(Number(a.total_ms) / 60000)} min
                     </div>
@@ -364,6 +369,130 @@ export default function Stats() {
                   );
                 })}
               </div>
+            </div>
+          )}
+
+          {tab === "skips" && skipStats && (
+            <div style={{ display: "grid", gap: 20 }}>
+              {/* Summary */}
+              <div
+                style={{
+                  display: "grid",
+                  gridTemplateColumns: "repeat(3, 1fr)",
+                  gap: 12,
+                }}
+              >
+                {[
+                  { label: "Total Skips", value: skipStats.skipCount },
+                  { label: "Total Plays", value: skipStats.totalPlays },
+                  { label: "Skip Rate", value: `${skipStats.skipRate}%` },
+                ].map(({ label, value }) => (
+                  <div
+                    key={label}
+                    style={{
+                      background: "var(--bg-secondary)",
+                      borderRadius: 10,
+                      padding: "20px 16px",
+                      border: "1px solid var(--border)",
+                      textAlign: "center",
+                    }}
+                  >
+                    <div style={{ fontSize: 28, fontWeight: 700, color: "var(--accent)" }}>{value}</div>
+                    <div className="text-secondary" style={{ fontSize: 12, marginTop: 4 }}>{label}</div>
+                  </div>
+                ))}
+              </div>
+
+              {/* Top skipped */}
+              {skipStats.topSkipped.length > 0 && (
+                <div
+                  style={{
+                    background: "var(--bg-secondary)",
+                    borderRadius: 10,
+                    padding: 20,
+                    border: "1px solid var(--border)",
+                  }}
+                >
+                  <h3 style={{ fontWeight: 700, marginBottom: 16 }}>Most Skipped Tracks</h3>
+                  {skipStats.topSkipped.map((t, i) => (
+                    <div
+                      key={t.track_id}
+                      style={{
+                        display: "flex",
+                        alignItems: "center",
+                        gap: 12,
+                        padding: "8px 0",
+                        borderBottom: i < skipStats.topSkipped.length - 1 ? "1px solid var(--border)" : "none",
+                      }}
+                    >
+                      <span className="text-muted" style={{ width: 20, fontSize: 13 }}>{i + 1}</span>
+                      {t.album_art && (
+                        <img src={t.album_art} alt="" style={{ width: 36, height: 36, borderRadius: 3 }} />
+                      )}
+                      <div style={{ flex: 1, minWidth: 0 }}>
+                        <div className="truncate" style={{ fontWeight: 600, fontSize: 14 }}>{t.track_name}</div>
+                        <div className="truncate text-secondary" style={{ fontSize: 12 }}>{t.artist_name}</div>
+                      </div>
+                      <div style={{ display: "flex", alignItems: "center", gap: 4, color: "var(--danger)", fontWeight: 700 }}>
+                        <SkipForward size={14} />
+                        {t.play_count}x
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+
+          {tab === "sessions" && (
+            <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+              {sessions.map((s) => {
+                const durMin = Math.round(Number(s.duration_secs) / 60);
+                return (
+                  <div
+                    key={s.session_id}
+                    style={{
+                      background: "var(--bg-secondary)",
+                      border: "1px solid var(--border)",
+                      borderRadius: 8,
+                      padding: "12px 16px",
+                      display: "flex",
+                      alignItems: "center",
+                      gap: 16,
+                    }}
+                  >
+                    <div style={{ flex: 1 }}>
+                      <div style={{ fontWeight: 600, fontSize: 14 }}>
+                        {new Date(s.started_at).toLocaleDateString([], { month: "short", day: "numeric", year: "numeric" })}
+                      </div>
+                      <div className="text-secondary" style={{ fontSize: 12 }}>
+                        {new Date(s.started_at).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
+                        {" — "}
+                        {new Date(s.ended_at).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
+                      </div>
+                    </div>
+                    <div style={{ display: "flex", gap: 16 }}>
+                      <div style={{ textAlign: "center" }}>
+                        <div style={{ fontWeight: 700, color: "var(--accent)" }}>{s.track_count}</div>
+                        <div className="text-muted" style={{ fontSize: 11 }}>tracks</div>
+                      </div>
+                      <div style={{ textAlign: "center" }}>
+                        <div style={{ fontWeight: 700 }}>{durMin}m</div>
+                        <div className="text-muted" style={{ fontSize: 11 }}>duration</div>
+                      </div>
+                      <div style={{ textAlign: "center" }}>
+                        <div style={{ fontWeight: 700, color: "var(--danger)" }}>{s.skip_count}</div>
+                        <div className="text-muted" style={{ fontSize: 11 }}>skips</div>
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
+              {sessions.length === 0 && (
+                <p className="text-secondary" style={{ textAlign: "center", padding: 40 }}>
+                  No session data yet.
+                </p>
+              )}
             </div>
           )}
         </>

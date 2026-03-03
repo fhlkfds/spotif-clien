@@ -51,6 +51,39 @@ export async function initDb() {
     CREATE INDEX IF NOT EXISTS idx_listen_history_user ON listen_history(user_id);
     CREATE INDEX IF NOT EXISTS idx_listen_history_played ON listen_history(played_at DESC);
     CREATE INDEX IF NOT EXISTS idx_downloads_user ON downloads(user_id);
+
+    -- Bookmarks (tracks/albums/artists/playlists)
+    CREATE TABLE IF NOT EXISTS bookmarks (
+      id SERIAL PRIMARY KEY,
+      user_id TEXT NOT NULL,
+      type TEXT NOT NULL,
+      item_id TEXT NOT NULL,
+      item_name TEXT NOT NULL,
+      item_uri TEXT,
+      metadata JSONB,
+      created_at TIMESTAMPTZ DEFAULT NOW(),
+      UNIQUE(user_id, type, item_id)
+    );
+    CREATE INDEX IF NOT EXISTS idx_bookmarks_user ON bookmarks(user_id);
+
+    -- Lyrics cache
+    CREATE TABLE IF NOT EXISTS lyrics_cache (
+      track_id TEXT PRIMARY KEY,
+      artist TEXT NOT NULL,
+      title TEXT NOT NULL,
+      synced_lyrics TEXT,
+      plain_lyrics TEXT,
+      source TEXT DEFAULT 'lrclib',
+      fetched_at TIMESTAMPTZ DEFAULT NOW()
+    );
+
+    -- Enhance listen_history for skip/crossfade/session tracking
+    ALTER TABLE listen_history
+      ADD COLUMN IF NOT EXISTS skipped BOOLEAN DEFAULT false,
+      ADD COLUMN IF NOT EXISTS play_duration_ms INTEGER,
+      ADD COLUMN IF NOT EXISTS crossfaded BOOLEAN DEFAULT false,
+      ADD COLUMN IF NOT EXISTS session_id TEXT;
+    CREATE INDEX IF NOT EXISTS idx_listen_history_session ON listen_history(session_id);
   `);
 
   console.log("Database initialized");

@@ -14,6 +14,10 @@ import { downloadsRouter } from "./routes/downloads";
 import { statsRouter } from "./routes/stats";
 import { themesRouter } from "./routes/themes";
 import { pluginsRouter } from "./routes/plugins";
+import { lastfmRouter } from "./routes/lastfm";
+import { lyricsRouter } from "./routes/lyrics";
+import { bookmarksRouter } from "./routes/bookmarks";
+import { offlineRouter } from "./routes/offline";
 
 const app = express();
 const server = http.createServer(app);
@@ -57,6 +61,10 @@ app.use("/api/downloads", downloadsRouter);
 app.use("/api/stats", statsRouter);
 app.use("/api/themes", themesRouter);
 app.use("/api/plugins", pluginsRouter);
+app.use("/api/lastfm", lastfmRouter);
+app.use("/api/lyrics", lyricsRouter);
+app.use("/api/bookmarks", bookmarksRouter);
+app.use("/api/offline", offlineRouter);
 
 app.get("/api/health", (_req, res) => {
   res.json({ status: "ok", timestamp: new Date().toISOString() });

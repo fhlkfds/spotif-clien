@@ -11,6 +11,9 @@ import {
   Plus,
   Check,
   X,
+  Disc3,
+  Bookmark,
+  Clock,
 } from "lucide-react";
 import { useStore } from "../store/useStore";
 import { spotify, auth } from "../api/client";
@@ -20,6 +23,9 @@ const NAV = [
   { to: "/", icon: Home, label: "Home" },
   { to: "/search", icon: Search, label: "Search" },
   { to: "/library", icon: Library, label: "Library" },
+  { to: "/new-releases", icon: Disc3, label: "New Releases" },
+  { to: "/bookmarks", icon: Bookmark, label: "Bookmarks" },
+  { to: "/history", icon: Clock, label: "History" },
   { to: "/stats", icon: BarChart2, label: "Stats" },
   { to: "/settings", icon: Settings, label: "Settings" },
 ];

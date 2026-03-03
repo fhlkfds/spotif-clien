@@ -125,3 +125,49 @@ export interface ActivityDay {
   date: string;
   plays: string;
 }
+
+export interface Bookmark {
+  id: number;
+  type: string;
+  item_id: string;
+  item_name: string;
+  item_uri?: string;
+  metadata?: Record<string, unknown>;
+  created_at: string;
+}
+
+export interface LyricsData {
+  synced_lyrics?: string;
+  plain_lyrics?: string;
+  source: string;
+}
+
+export interface QueueState {
+  currently_playing: SpotifyTrack | null;
+  queue: SpotifyTrack[];
+}
+
+export interface LastFmTag {
+  name: string;
+  url: string;
+  count?: number;
+}
+
+export interface LastFmArtist {
+  name: string;
+  url: string;
+  image?: { "#text": string; size: string }[];
+}
+
+export interface NewRelease {
+  id: string;
+  name: string;
+  artists: SpotifyArtist[];
+  images: SpotifyImage[];
+  release_date: string;
+  total_tracks: number;
+}
+
+export interface OfflineTrack extends Download {
+  file_url: string;
+}

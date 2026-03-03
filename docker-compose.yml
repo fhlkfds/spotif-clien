@@ -40,6 +40,7 @@ services:
       - DOWNLOADS_PATH=/downloads
       - THEMES_PATH=/themes-user
       - PLUGINS_PATH=/plugins
+      - LASTFM_API_KEY=${LASTFM_API_KEY:-}
     volumes:
       - ./downloads:/downloads
       - ./plugins:/plugins:ro

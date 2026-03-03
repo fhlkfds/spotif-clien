@@ -5,6 +5,7 @@ import { useStore } from "./store/useStore";
 import { useTheme } from "./hooks/useTheme";
 import { useSpotifyPlayer } from "./hooks/useSpotifyPlayer";
 import { usePlaybackPoller } from "./hooks/usePlaybackPoller";
+import { useOfflinePlayer } from "./hooks/useOfflinePlayer";
 import { PluginSystem } from "./plugins/PluginSystem";
 import Layout from "./components/Layout";
 import LoginPage from "./pages/Login";
@@ -16,12 +17,17 @@ import Settings from "./pages/Settings";
 import PlaylistView from "./pages/PlaylistView";
 import AlbumView from "./pages/AlbumView";
 import ArtistView from "./pages/ArtistView";
+import NewReleasesPage from "./pages/NewReleasesPage";
+import BookmarksPage from "./pages/BookmarksPage";
+import TagPage from "./pages/TagPage";
+import HistoryPage from "./pages/HistoryPage";
 
 export default function App() {
   const { isAuthenticated, isPremium, setAuth } = useStore();
   useTheme();
   useSpotifyPlayer();
   usePlaybackPoller();
+  useOfflinePlayer();
 
   useEffect(() => {
     auth.getMe().then((data) => {
@@ -49,7 +55,6 @@ export default function App() {
             PluginSystem.loadPlugin(p.name, pluginsApi.bundleUrl(p.name));
           });
 
-        // Fire app:ready
         PluginSystem.emit("app:ready", undefined as never);
       })
       .catch(() => {});
@@ -70,6 +75,10 @@ export default function App() {
         <Route path="/playlist/:id" element={<PlaylistView />} />
         <Route path="/album/:id" element={<AlbumView />} />
         <Route path="/artist/:id" element={<ArtistView />} />
+        <Route path="/new-releases" element={<NewReleasesPage />} />
+        <Route path="/bookmarks" element={<BookmarksPage />} />
+        <Route path="/tag/:name" element={<TagPage />} />
+        <Route path="/history" element={<HistoryPage />} />
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
     </Layout>

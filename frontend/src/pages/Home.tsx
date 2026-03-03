@@ -3,7 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { Play } from "lucide-react";
 import { spotify } from "../api/client";
 import { useStore } from "../store/useStore";
-import type { SpotifyPlaylist, SpotifyTrack } from "../types";
+import type { SpotifyPlaylist, SpotifyTrack, NewRelease } from "../types";
 
 interface RecentItem {
   track: SpotifyTrack;
@@ -122,17 +122,21 @@ export default function Home() {
   const [playlists, setPlaylists] = useState<SpotifyPlaylist[]>([]);
   const [recents, setRecents] = useState<RecentItem[]>([]);
   const [recommended, setRecommended] = useState<SpotifyTrack[]>([]);
+  const [newReleases, setNewReleases] = useState<NewRelease[]>([]);
   const [loading, setLoading] = useState(true);
+  const navigate = useNavigate();
 
   useEffect(() => {
     Promise.all([
       spotify.getPlaylists(),
       spotify.getRecentlyPlayed(),
       spotify.getTopItems("tracks", "short_term"),
+      spotify.getNewReleases(6),
     ])
-      .then(async ([pl, recent, top]) => {
+      .then(async ([pl, recent, top, nr]) => {
         setPlaylists(pl.items?.slice(0, 6) ?? []);
         setRecents(recent.items?.slice(0, 6) ?? []);
+        setNewReleases(nr?.albums?.items?.slice(0, 6) ?? []);
 
         // Fetch recommendations seeded from top 5 tracks
         const seedTracks = (top.items as SpotifyTrack[])
@@ -198,6 +202,52 @@ export default function Home() {
           </p>
           <div className="grid-cards">
             {recommended.map((track) => <TrackCard key={track.id} track={track} />)}
+          </div>
+        </section>
+      )}
+
+      {/* New Releases */}
+      {newReleases.length > 0 && (
+        <section style={{ marginBottom: 40 }}>
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 16 }}>
+            <h2 style={{ fontSize: 22, fontWeight: 700 }}>New Releases</h2>
+            <button
+              className="btn-ghost"
+              style={{ fontSize: 13 }}
+              onClick={() => navigate("/new-releases")}
+            >
+              See all →
+            </button>
+          </div>
+          <div className="grid-cards">
+            {newReleases.map((album) => (
+              <div
+                key={album.id}
+                className="card"
+                onClick={() => navigate(`/album/${album.id}`)}
+              >
+                <div style={{ position: "relative", marginBottom: 12 }}>
+                  <img
+                    src={album.images?.[0]?.url ?? ""}
+                    alt=""
+                    style={{ width: "100%", aspectRatio: "1", objectFit: "cover", borderRadius: 4 }}
+                  />
+                  <div
+                    style={{
+                      position: "absolute", top: 6, right: 6,
+                      background: "var(--accent)", color: "#000",
+                      fontSize: 10, fontWeight: 700, padding: "2px 6px", borderRadius: 4,
+                    }}
+                  >
+                    {album.release_date?.split("-")[0]}
+                  </div>
+                </div>
+                <div className="truncate" style={{ fontWeight: 600, fontSize: 14 }}>{album.name}</div>
+                <div className="truncate text-secondary" style={{ fontSize: 12, marginTop: 4 }}>
+                  {album.artists.map((a) => a.name).join(", ")}
+                </div>
+              </div>
+            ))}
           </div>
         </section>
       )}
