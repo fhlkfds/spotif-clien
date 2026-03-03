@@ -1,5 +1,5 @@
 import { create } from "zustand";
-import type { PlaybackState, SpotifyTrack, SpotifyUser } from "../types";
+import type { PlaybackState, SpotifyTrack, SpotifyUser, ListeningMode, UserSettings } from "../types";
 
 function generateSessionId() {
   return `${Date.now()}-${Math.random().toString(36).slice(2)}`;
@@ -52,6 +52,24 @@ interface AppStore {
   sessionStartMs: number;
   incrementSessionTrackCount: () => void;
   incrementSessionLoops: () => void;
+
+  // Player UI overlays
+  nowPlayingOpen: boolean;
+  setNowPlayingOpen: (v: boolean) => void;
+  miniPlayerMode: boolean;
+  setMiniPlayerMode: (v: boolean) => void;
+
+  // Listening mode
+  listeningMode: ListeningMode;
+  setListeningMode: (mode: ListeningMode) => void;
+
+  // User settings (synced from DB)
+  userSettings: UserSettings | null;
+  setUserSettings: (s: UserSettings) => void;
+
+  // Keyboard shortcuts help modal
+  shortcutsOpen: boolean;
+  setShortcutsOpen: (v: boolean) => void;
 }
 
 export const useStore = create<AppStore>((set) => ({
@@ -108,4 +126,25 @@ export const useStore = create<AppStore>((set) => ({
     set((s) => ({ sessionTrackCount: s.sessionTrackCount + 1 })),
   incrementSessionLoops: () =>
     set((s) => ({ sessionLoops: s.sessionLoops + 1 })),
+
+  // Player UI overlays
+  nowPlayingOpen: false,
+  setNowPlayingOpen: (nowPlayingOpen) => set({ nowPlayingOpen }),
+  miniPlayerMode: false,
+  setMiniPlayerMode: (miniPlayerMode) => set({ miniPlayerMode }),
+
+  // Listening mode
+  listeningMode: (localStorage.getItem("listening-mode") as ListeningMode) ?? "normal",
+  setListeningMode: (listeningMode) => {
+    localStorage.setItem("listening-mode", listeningMode);
+    set({ listeningMode });
+  },
+
+  // User settings
+  userSettings: null,
+  setUserSettings: (userSettings) => set({ userSettings }),
+
+  // Keyboard shortcuts modal
+  shortcutsOpen: false,
+  setShortcutsOpen: (shortcutsOpen) => set({ shortcutsOpen }),
 }));

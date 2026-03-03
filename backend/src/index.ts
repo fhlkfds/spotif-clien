@@ -18,6 +18,9 @@ import { lastfmRouter } from "./routes/lastfm";
 import { lyricsRouter } from "./routes/lyrics";
 import { bookmarksRouter } from "./routes/bookmarks";
 import { offlineRouter } from "./routes/offline";
+import { smartPlaylistsRouter } from "./routes/smart_playlists";
+import { pinnedRouter } from "./routes/pinned";
+import { userSettingsRouter } from "./routes/user_settings";
 
 const app = express();
 const server = http.createServer(app);
@@ -65,6 +68,9 @@ app.use("/api/lastfm", lastfmRouter);
 app.use("/api/lyrics", lyricsRouter);
 app.use("/api/bookmarks", bookmarksRouter);
 app.use("/api/offline", offlineRouter);
+app.use("/api/smart-playlists", smartPlaylistsRouter);
+app.use("/api/pinned", pinnedRouter);
+app.use("/api/user-settings", userSettingsRouter);
 
 app.get("/api/health", (_req, res) => {
   res.json({ status: "ok", timestamp: new Date().toISOString() });

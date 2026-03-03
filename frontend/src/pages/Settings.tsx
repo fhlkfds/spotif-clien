@@ -1,17 +1,25 @@
 import { useEffect, useState, useRef } from "react";
-import { Palette, Puzzle, Download as DownloadIcon, Trash2, RefreshCw, Check, Radio, Play } from "lucide-react";
-import { themes, plugins as pluginsApi, downloads as downloadsApi, offline as offlineApi } from "../api/client";
+import {
+  Palette, Puzzle, Download as DownloadIcon, Trash2, RefreshCw, Check,
+  Radio, Play, Keyboard, Activity, Moon, Dumbbell, Car, Volume2,
+} from "lucide-react";
+import { themes, plugins as pluginsApi, downloads as downloadsApi, offline as offlineApi, userSettings } from "../api/client";
 import { useTheme } from "../hooks/useTheme";
 import { PluginSystem } from "../plugins/PluginSystem";
 import { useStore } from "../store/useStore";
-import type { ThemeInfo, PluginInfo, Download, OfflineTrack } from "../types";
+import { DEFAULT_SHORTCUTS } from "../hooks/useKeyboardShortcuts";
+import type { ThemeInfo, PluginInfo, Download, OfflineTrack, ListeningMode } from "../types";
 
-type Section = "themes" | "plugins" | "downloads";
+type Section = "themes" | "plugins" | "downloads" | "playback" | "shortcuts";
 
 export default function Settings() {
   const [section, setSection] = useState<Section>("themes");
   const { currentTheme, changeTheme } = useTheme();
-  const { setOfflineTrack } = useStore();
+  const { setOfflineTrack, listeningMode, setListeningMode, setUserSettings, userSettings: storedSettings } = useStore();
+
+  // Playback settings
+  const [crossfadeMs, setCrossfadeMs] = useState(storedSettings?.crossfade_ms ?? 0);
+  const [volumeNormalize, setVolumeNormalize] = useState(storedSettings?.volume_normalize ?? false);
 
   // Themes
   const [themeList, setThemeList] = useState<ThemeInfo[]>([]);
@@ -102,8 +110,27 @@ export default function Settings() {
     setOfflineTracks((prev) => prev.filter((d) => d.id !== id));
   }
 
+  async function savePlaybackSettings() {
+    const updated = await userSettings.update({
+      listening_mode: listeningMode,
+      crossfade_ms: crossfadeMs,
+      volume_normalize: volumeNormalize,
+    });
+    setUserSettings(updated);
+  }
+
+  const LISTENING_MODES: { key: ListeningMode; label: string; desc: string; icon: typeof Activity }[] = [
+    { key: "normal", label: "Normal", desc: "Default listening experience", icon: Activity },
+    { key: "focus", label: "Focus", desc: "Minimal UI, no distractions. Good for work.", icon: Activity },
+    { key: "gym", label: "Gym", desc: "High energy — boost volume, show BPM", icon: Dumbbell },
+    { key: "driving", label: "Driving", desc: "Large controls, high contrast, fewer distractions", icon: Car },
+    { key: "sleep", label: "Sleep", desc: "Dim UI, low volume, auto-pause after playlist ends", icon: Moon },
+  ];
+
   const SECTIONS: { key: Section; label: string; icon: typeof Palette }[] = [
     { key: "themes", label: "Themes", icon: Palette },
+    { key: "playback", label: "Playback", icon: Volume2 },
+    { key: "shortcuts", label: "Shortcuts", icon: Keyboard },
     { key: "plugins", label: "Plugins", icon: Puzzle },
     { key: "downloads", label: "Downloads", icon: DownloadIcon },
   ];
@@ -350,6 +377,150 @@ export default function Settings() {
               >
                 Get Last.fm API Key ↗
               </a>
+            </div>
+          </div>
+        )}
+
+        {section === "playback" && (
+          <div>
+            <h2 style={{ fontSize: 20, fontWeight: 700, marginBottom: 8 }}>Playback</h2>
+            <p className="text-secondary" style={{ marginBottom: 24, fontSize: 14 }}>
+              Listening modes, crossfade, and volume settings.
+            </p>
+
+            {/* Listening modes */}
+            <div style={{ background: "var(--bg-secondary)", borderRadius: 10, padding: 20, border: "1px solid var(--border)", marginBottom: 16 }}>
+              <h3 style={{ fontWeight: 700, marginBottom: 4 }}>Listening Mode</h3>
+              <p className="text-secondary" style={{ fontSize: 13, marginBottom: 16 }}>
+                Adjusts the UI and experience to fit your context.
+              </p>
+              <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(160px, 1fr))", gap: 10 }}>
+                {LISTENING_MODES.map(({ key, label, desc, icon: Icon }) => (
+                  <button
+                    key={key}
+                    onClick={() => setListeningMode(key)}
+                    style={{
+                      padding: 14,
+                      borderRadius: 10,
+                      border: `2px solid ${listeningMode === key ? "var(--accent)" : "var(--border)"}`,
+                      background: listeningMode === key ? "rgba(29,185,84,0.08)" : "var(--bg-tertiary)",
+                      cursor: "pointer",
+                      textAlign: "left",
+                      transition: "all 0.2s",
+                      position: "relative",
+                    }}
+                  >
+                    {listeningMode === key && (
+                      <div style={{ position: "absolute", top: 8, right: 8, background: "var(--accent)", borderRadius: "50%", width: 16, height: 16, display: "flex", alignItems: "center", justifyContent: "center" }}>
+                        <Check size={10} color="#000" />
+                      </div>
+                    )}
+                    <Icon size={18} color={listeningMode === key ? "var(--accent)" : "var(--text-secondary)"} style={{ marginBottom: 8 }} />
+                    <div style={{ fontWeight: 700, fontSize: 14, marginBottom: 4 }}>{label}</div>
+                    <div style={{ fontSize: 11, color: "var(--text-secondary)", lineHeight: 1.4 }}>{desc}</div>
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Crossfade */}
+            <div style={{ background: "var(--bg-secondary)", borderRadius: 10, padding: 20, border: "1px solid var(--border)", marginBottom: 16 }}>
+              <h3 style={{ fontWeight: 700, marginBottom: 4 }}>Crossfade</h3>
+              <p className="text-secondary" style={{ fontSize: 13, marginBottom: 16 }}>
+                Blend between tracks. Works for offline/HTML5 audio. For Spotify streaming, set this in the Spotify app settings.
+              </p>
+              <label style={{ fontSize: 13 }}>
+                <span className="text-secondary" style={{ display: "block", marginBottom: 8 }}>
+                  Crossfade duration: <strong>{crossfadeMs / 1000}s</strong>
+                </span>
+                <input
+                  type="range"
+                  min={0}
+                  max={12000}
+                  step={1000}
+                  value={crossfadeMs}
+                  onChange={(e) => setCrossfadeMs(Number(e.target.value))}
+                  style={{ width: "100%", accentColor: "var(--accent)" }}
+                />
+                <div style={{ display: "flex", justifyContent: "space-between", fontSize: 11, color: "var(--text-muted)", marginTop: 4 }}>
+                  <span>Off</span><span>12s</span>
+                </div>
+              </label>
+            </div>
+
+            {/* Volume normalization */}
+            <div style={{ background: "var(--bg-secondary)", borderRadius: 10, padding: 20, border: "1px solid var(--border)", marginBottom: 16 }}>
+              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+                <div>
+                  <h3 style={{ fontWeight: 700, marginBottom: 4 }}>Volume Normalization</h3>
+                  <p className="text-secondary" style={{ fontSize: 13 }}>
+                    Equalise volume levels between tracks. Applied to offline audio playback.
+                  </p>
+                </div>
+                <button
+                  onClick={() => setVolumeNormalize(!volumeNormalize)}
+                  style={{
+                    width: 44, height: 24, borderRadius: 12, border: "none", cursor: "pointer",
+                    background: volumeNormalize ? "var(--accent)" : "var(--bg-tertiary)",
+                    position: "relative", transition: "background 0.2s", flexShrink: 0,
+                  }}
+                >
+                  <div
+                    style={{
+                      position: "absolute", top: 3,
+                      left: volumeNormalize ? "calc(100% - 21px)" : 3,
+                      width: 18, height: 18, borderRadius: "50%",
+                      background: "white", transition: "left 0.2s",
+                    }}
+                  />
+                </button>
+              </div>
+            </div>
+
+            <button className="btn btn-primary" onClick={savePlaybackSettings}>
+              Save Playback Settings
+            </button>
+          </div>
+        )}
+
+        {section === "shortcuts" && (
+          <div>
+            <h2 style={{ fontSize: 20, fontWeight: 700, marginBottom: 8 }}>Keyboard Shortcuts</h2>
+            <p className="text-secondary" style={{ marginBottom: 24, fontSize: 14 }}>
+              Global shortcuts active when not typing. Press <kbd style={{ fontFamily: "monospace", background: "var(--bg-tertiary)", padding: "2px 6px", borderRadius: 4 }}>?</kbd> anywhere to show this.
+            </p>
+            <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+              {Object.entries(DEFAULT_SHORTCUTS).map(([key, action]) => (
+                <div
+                  key={key}
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "space-between",
+                    padding: "10px 14px",
+                    borderRadius: 8,
+                    background: "var(--bg-secondary)",
+                    border: "1px solid var(--border)",
+                  }}
+                >
+                  <span style={{ fontSize: 14 }}>{action}</span>
+                  <kbd
+                    style={{
+                      background: "var(--bg-primary)",
+                      border: "1px solid var(--border)",
+                      borderRadius: 6,
+                      padding: "4px 12px",
+                      fontSize: 13,
+                      fontFamily: "monospace",
+                      fontWeight: 700,
+                      minWidth: 36,
+                      textAlign: "center",
+                    }}
+                  >
+                    {key === " " ? "Space" : key === "?" ? "Shift+/" : key === "ArrowUp" ? "Shift+↑" : key === "ArrowDown" ? "Shift+↓" : key}
+                  </kbd>
+                </div>
+              ))}
             </div>
           </div>
         )}

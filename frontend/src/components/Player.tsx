@@ -1,28 +1,22 @@
 import { useEffect, useRef, useState, useCallback } from "react";
 import {
-  Play,
-  Pause,
-  SkipBack,
-  SkipForward,
-  Shuffle,
-  Repeat,
-  Repeat1,
-  Volume2,
-  VolumeX,
-  Download,
-  Heart,
-  Monitor,
-  Mic2,
-  List,
-  WifiOff,
+  Play, Pause, SkipBack, SkipForward,
+  Shuffle, Repeat, Repeat1,
+  Volume2, VolumeX,
+  Download, Heart, Monitor,
+  Mic2, List, WifiOff,
+  Maximize2, Minimize2, PictureInPicture2,
+  AlertTriangle,
 } from "lucide-react";
 import { useStore } from "../store/useStore";
 import { spotify, downloads } from "../api/client";
 import { PluginSystem } from "../plugins/PluginSystem";
-import { AlertTriangle } from "lucide-react";
 import LyricsPanel from "./LyricsPanel";
 import QueuePanel from "./QueuePanel";
+import NowPlayingModal from "./NowPlayingModal";
+import MiniPlayer from "./MiniPlayer";
 import { useOfflinePlayer } from "../hooks/useOfflinePlayer";
+import { usePiP } from "../hooks/usePiP";
 
 function formatTime(ms: number) {
   const s = Math.floor(ms / 1000);
@@ -33,9 +27,12 @@ export default function Player() {
   const {
     playbackState, deviceId, sdkConnected, isPremium,
     queueOpen, setQueueOpen, lyricsOpen, setLyricsOpen,
+    nowPlayingOpen, setNowPlayingOpen,
+    miniPlayerMode, setMiniPlayerMode,
     currentSource,
   } = useStore();
   const { pauseOffline, resumeOffline, seekOffline } = useOfflinePlayer();
+  const { enterPiP, exitPiP, isPiP } = usePiP();
 
   const [sdkWarningDismissed, setSdkWarningDismissed] = useState(false);
   const [sdkTimeout, setSdkTimeout] = useState(false);
@@ -210,9 +207,11 @@ export default function Player() {
         </div>
       )}
 
-      {/* Lyrics + Queue panels */}
+      {/* Overlays */}
       <LyricsPanel />
       <QueuePanel />
+      <NowPlayingModal />
+      <MiniPlayer />
 
       <div
         className="player-bar"
@@ -231,7 +230,9 @@ export default function Player() {
             <img
               src={track.album.images[0].url}
               alt={track.album.name}
-              style={{ width: 56, height: 56, borderRadius: 4, objectFit: "cover", flexShrink: 0 }}
+              onClick={() => setNowPlayingOpen(true)}
+              title="Open full-screen player"
+              style={{ width: 56, height: 56, borderRadius: 4, objectFit: "cover", flexShrink: 0, cursor: "pointer" }}
             />
           ) : (
             <div style={{ width: 56, height: 56, borderRadius: 4, background: "var(--bg-tertiary)", flexShrink: 0 }} />
@@ -349,12 +350,46 @@ export default function Player() {
 
         {/* Volume + device status + download + lyrics + queue */}
         <div style={{ display: "flex", alignItems: "center", gap: 8, justifyContent: "flex-end" }}>
+          {/* Now playing fullscreen */}
+          {track && (
+            <button
+              className="btn-ghost"
+              onClick={() => setNowPlayingOpen(!nowPlayingOpen)}
+              title="Full-screen player (F)"
+              style={{ color: nowPlayingOpen ? "var(--accent)" : "var(--text-secondary)", padding: 4 }}
+            >
+              {nowPlayingOpen ? <Minimize2 size={16} /> : <Maximize2 size={16} />}
+            </button>
+          )}
+
+          {/* Mini player toggle */}
+          <button
+            className="btn-ghost"
+            onClick={() => setMiniPlayerMode(!miniPlayerMode)}
+            title="Mini player (M)"
+            style={{ color: miniPlayerMode ? "var(--accent)" : "var(--text-secondary)", padding: 4 }}
+          >
+            <PictureInPicture2 size={16} />
+          </button>
+
+          {/* PiP */}
+          {track && (
+            <button
+              className="btn-ghost"
+              onClick={() => isPiP ? exitPiP() : enterPiP()}
+              title="Picture-in-Picture"
+              style={{ color: isPiP ? "var(--accent)" : "var(--text-secondary)", padding: 4 }}
+            >
+              <PictureInPicture2 size={14} />
+            </button>
+          )}
+
           {/* Lyrics button */}
           {track && (
             <button
               className="btn-ghost"
               onClick={() => setLyricsOpen(!lyricsOpen)}
-              title="Lyrics"
+              title="Lyrics (L)"
               style={{ color: lyricsOpen ? "var(--accent)" : "var(--text-secondary)", padding: 4 }}
             >
               <Mic2 size={16} />
@@ -365,7 +400,7 @@ export default function Player() {
           <button
             className="btn-ghost"
             onClick={() => setQueueOpen(!queueOpen)}
-            title="Queue"
+            title="Queue (Q)"
             style={{ color: queueOpen ? "var(--accent)" : "var(--text-secondary)", padding: 4 }}
           >
             <List size={16} />

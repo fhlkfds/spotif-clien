@@ -171,3 +171,70 @@ export interface NewRelease {
 export interface OfflineTrack extends Download {
   file_url: string;
 }
+
+export interface AudioFeatures {
+  track_id?: string;
+  id?: string;
+  danceability: number;   // 0-1
+  energy: number;         // 0-1
+  key: number;            // 0-11
+  loudness: number;       // dB
+  mode: number;           // 0=minor 1=major
+  speechiness: number;
+  acousticness: number;
+  instrumentalness: number;
+  liveness: number;
+  valence: number;        // 0-1 positivity
+  tempo: number;          // BPM
+  time_signature: number;
+}
+
+export type SmartPlaylistRule =
+  | { field: "play_count"; op: "lt" | "gt" | "lte" | "gte"; value: number }
+  | { field: "energy" | "valence" | "tempo" | "danceability" | "acousticness"; op: "lt" | "gt"; value: number }
+  | { field: "liked_within_days"; op: "eq"; value: number }
+  | { field: "skipped"; op: "eq"; value: boolean };
+
+export interface SmartPlaylist {
+  id: number;
+  name: string;
+  description: string;
+  rules: SmartPlaylistRule[];
+  created_at: string;
+  updated_at: string;
+}
+
+export interface PinnedItem {
+  id: number;
+  type: "artist" | "playlist" | "album";
+  item_id: string;
+  item_name: string;
+  metadata?: Record<string, unknown>;
+  position: number;
+}
+
+export type ListeningMode = "normal" | "focus" | "gym" | "driving" | "sleep";
+
+export interface UserSettings {
+  user_id: string;
+  listening_mode: ListeningMode;
+  crossfade_ms: number;
+  volume_normalize: boolean;
+  custom_start_page: string;
+  widgets: string[];
+  keyboard_shortcuts: Record<string, string>;
+  updated_at: string;
+}
+
+export interface PlaylistInsights {
+  trackCount: number;
+  totalDuration: number;
+  avgEnergy: number;
+  avgValence: number;
+  avgTempo: number;
+  avgDanceability: number;
+  topArtists: { name: string; count: number }[];
+  moodLabel: string;
+  energyLabel: string;
+  artistDiversity: number;
+}

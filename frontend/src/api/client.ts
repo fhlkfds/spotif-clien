@@ -1,5 +1,5 @@
 import axios from "axios";
-import type { LyricsData, Bookmark, OfflineTrack } from "../types";
+import type { LyricsData, Bookmark, OfflineTrack, AudioFeatures, SmartPlaylist, SmartPlaylistRule, PinnedItem, UserSettings } from "../types";
 
 const api = axios.create({
   baseURL: "/api",
@@ -83,6 +83,12 @@ export const spotify = {
     api.post(`/spotify/playlists/${playlistId}/tracks`, { uris }),
   removeFromPlaylist: (playlistId: string, uris: string[]) =>
     api.delete(`/spotify/playlists/${playlistId}/tracks`, { data: { uris } }),
+
+  getAudioFeatures: (id: string) =>
+    api.get(`/spotify/audio-features/${id}`).then((r) => r.data as AudioFeatures),
+  getAudioFeaturesBatch: (ids: string[]) =>
+    api.get("/spotify/audio-features", { params: { ids: ids.join(",") } })
+      .then((r) => r.data.audio_features as (AudioFeatures | null)[]),
 };
 
 export const auth = {
@@ -181,6 +187,31 @@ export const lastfm = {
 
 export const offline = {
   list: () => api.get("/offline/tracks").then((r) => r.data as OfflineTrack[]),
+};
+
+export const smartPlaylists = {
+  list: () => api.get("/smart-playlists").then((r) => r.data as SmartPlaylist[]),
+  create: (name: string, description: string, rules: SmartPlaylistRule[]) =>
+    api.post("/smart-playlists", { name, description, rules }).then((r) => r.data as SmartPlaylist),
+  update: (id: number, updates: Partial<SmartPlaylist>) =>
+    api.put(`/smart-playlists/${id}`, updates).then((r) => r.data as SmartPlaylist),
+  delete: (id: number) => api.delete(`/smart-playlists/${id}`),
+  getTracks: (id: number) => api.get(`/smart-playlists/${id}/tracks`).then((r) => r.data),
+};
+
+export const pinned = {
+  list: () => api.get("/pinned").then((r) => r.data as PinnedItem[]),
+  add: (type: string, item_id: string, item_name: string, metadata?: Record<string, unknown>) =>
+    api.post("/pinned", { type, item_id, item_name, metadata }),
+  remove: (type: string, itemId: string) => api.delete(`/pinned/${type}/${itemId}`),
+  check: (type: string, itemId: string) =>
+    api.get(`/pinned/${type}/${itemId}/check`).then((r) => r.data.pinned as boolean),
+};
+
+export const userSettings = {
+  get: () => api.get("/user-settings").then((r) => r.data as UserSettings),
+  update: (settings: Partial<UserSettings>) =>
+    api.put("/user-settings", settings).then((r) => r.data as UserSettings),
 };
 
 export default api;

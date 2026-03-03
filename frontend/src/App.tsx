@@ -1,11 +1,12 @@
 import { useEffect } from "react";
 import { Routes, Route, Navigate } from "react-router-dom";
-import { auth, plugins as pluginsApi } from "./api/client";
+import { auth, plugins as pluginsApi, userSettings } from "./api/client";
 import { useStore } from "./store/useStore";
 import { useTheme } from "./hooks/useTheme";
 import { useSpotifyPlayer } from "./hooks/useSpotifyPlayer";
 import { usePlaybackPoller } from "./hooks/usePlaybackPoller";
 import { useOfflinePlayer } from "./hooks/useOfflinePlayer";
+import { useKeyboardShortcuts } from "./hooks/useKeyboardShortcuts";
 import { PluginSystem } from "./plugins/PluginSystem";
 import Layout from "./components/Layout";
 import LoginPage from "./pages/Login";
@@ -21,13 +22,17 @@ import NewReleasesPage from "./pages/NewReleasesPage";
 import BookmarksPage from "./pages/BookmarksPage";
 import TagPage from "./pages/TagPage";
 import HistoryPage from "./pages/HistoryPage";
+import SmartPlaylistsPage from "./pages/SmartPlaylistsPage";
+import DiscoveryPage from "./pages/DiscoveryPage";
+import KeyboardShortcutsModal from "./components/KeyboardShortcutsModal";
 
 export default function App() {
-  const { isAuthenticated, isPremium, setAuth } = useStore();
+  const { isAuthenticated, isPremium, setAuth, setUserSettings } = useStore();
   useTheme();
   useSpotifyPlayer();
   usePlaybackPoller();
   useOfflinePlayer();
+  useKeyboardShortcuts();
 
   useEffect(() => {
     auth.getMe().then((data) => {
@@ -36,6 +41,12 @@ export default function App() {
       }
     }).catch(() => {});
   }, [setAuth]);
+
+  // Load user settings after auth
+  useEffect(() => {
+    if (!isAuthenticated) return;
+    userSettings.get().then(setUserSettings).catch(() => {});
+  }, [isAuthenticated, setUserSettings]);
 
   // Load enabled plugins after auth
   useEffect(() => {
@@ -66,6 +77,7 @@ export default function App() {
 
   return (
     <Layout>
+      <KeyboardShortcutsModal />
       <Routes>
         <Route path="/" element={<Home />} />
         <Route path="/search" element={<Search />} />
@@ -79,6 +91,8 @@ export default function App() {
         <Route path="/bookmarks" element={<BookmarksPage />} />
         <Route path="/tag/:name" element={<TagPage />} />
         <Route path="/history" element={<HistoryPage />} />
+        <Route path="/smart-playlists" element={<SmartPlaylistsPage />} />
+        <Route path="/discovery" element={<DiscoveryPage />} />
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
     </Layout>

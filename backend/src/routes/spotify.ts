@@ -509,6 +509,86 @@ spotifyRouter.delete("/playlists/:id/tracks", async (req: Request, res: Response
   }
 });
 
+// Audio features - single track
+spotifyRouter.get("/audio-features/:id", async (req: Request, res: Response) => {
+  try {
+    // Check cache first
+    const cached = await pool.query(
+      "SELECT * FROM audio_features_cache WHERE track_id = $1",
+      [req.params.id]
+    );
+    if (cached.rows.length > 0) {
+      return res.json(cached.rows[0]);
+    }
+    const data = await spotifyFetch(req.session.accessToken!, `/audio-features/${req.params.id}`);
+    if (data) {
+      await pool.query(
+        `INSERT INTO audio_features_cache
+           (track_id, danceability, energy, key, loudness, mode, speechiness, acousticness,
+            instrumentalness, liveness, valence, tempo, time_signature)
+         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13)
+         ON CONFLICT (track_id) DO UPDATE SET
+           danceability=EXCLUDED.danceability, energy=EXCLUDED.energy, tempo=EXCLUDED.tempo,
+           valence=EXCLUDED.valence, fetched_at=NOW()`,
+        [req.params.id, data.danceability, data.energy, data.key, data.loudness,
+         data.mode, data.speechiness, data.acousticness, data.instrumentalness,
+         data.liveness, data.valence, data.tempo, data.time_signature]
+      );
+    }
+    res.json(data);
+  } catch (err: unknown) {
+    res.status(errStatus(err)).json({ error: String(err) });
+  }
+});
+
+// Audio features - batch (up to 100 ids)
+spotifyRouter.get("/audio-features", async (req: Request, res: Response) => {
+  try {
+    const ids = (req.query.ids as string)?.split(",").filter(Boolean) ?? [];
+    if (!ids.length) return res.json({ audio_features: [] });
+
+    // Check cache for all
+    const cached = await pool.query(
+      "SELECT * FROM audio_features_cache WHERE track_id = ANY($1)",
+      [ids]
+    );
+    const cachedMap = new Map(cached.rows.map((r: { track_id: string }) => [r.track_id, r]));
+    const missing = ids.filter((id) => !cachedMap.has(id));
+
+    let fetched: Record<string, unknown>[] = [];
+    if (missing.length > 0) {
+      const data = await spotifyFetch(
+        req.session.accessToken!,
+        `/audio-features?ids=${missing.join(",")}`
+      );
+      fetched = (data?.audio_features ?? []).filter(Boolean);
+      // Cache missing ones
+      for (const f of fetched) {
+        await pool.query(
+          `INSERT INTO audio_features_cache
+             (track_id, danceability, energy, key, loudness, mode, speechiness, acousticness,
+              instrumentalness, liveness, valence, tempo, time_signature)
+           VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13)
+           ON CONFLICT (track_id) DO NOTHING`,
+          [(f as { id: string }).id, (f as Record<string, number>).danceability,
+           (f as Record<string, number>).energy, (f as Record<string, number>).key,
+           (f as Record<string, number>).loudness, (f as Record<string, number>).mode,
+           (f as Record<string, number>).speechiness, (f as Record<string, number>).acousticness,
+           (f as Record<string, number>).instrumentalness, (f as Record<string, number>).liveness,
+           (f as Record<string, number>).valence, (f as Record<string, number>).tempo,
+           (f as Record<string, number>).time_signature]
+        ).catch(() => {});
+      }
+    }
+
+    const fetchedMap = new Map(fetched.map((f) => [(f as { id: string }).id, f]));
+    const result = ids.map((id) => cachedMap.get(id) ?? fetchedMap.get(id) ?? null);
+    res.json({ audio_features: result });
+  } catch (err: unknown) {
+    res.status(errStatus(err)).json({ error: String(err) });
+  }
+});
+
 // Create playlist
 spotifyRouter.post("/users/:userId/playlists", async (req: Request, res: Response) => {
   try {
