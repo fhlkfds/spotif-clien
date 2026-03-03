@@ -37,7 +37,9 @@ const sessionMiddleware = session({
   resave: false,
   saveUninitialized: false,
   cookie: {
-    secure: process.env.NODE_ENV === "production",
+    // Only set secure=true when explicitly serving over HTTPS.
+    // NODE_ENV=production over plain HTTP (e.g. local Docker) will drop secure cookies.
+    secure: process.env.COOKIE_SECURE === "true",
     httpOnly: true,
     maxAge: 7 * 24 * 60 * 60 * 1000,
     sameSite: "lax",

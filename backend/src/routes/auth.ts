@@ -32,7 +32,14 @@ authRouter.get("/login", (req: Request, res: Response) => {
     state,
   });
 
-  res.redirect(`https://accounts.spotify.com/authorize?${params}`);
+  // Save session before redirect so oauthState is persisted in Redis
+  req.session.save((err) => {
+    if (err) {
+      console.error("Session save error:", err);
+      return res.status(500).send("Session error");
+    }
+    res.redirect(`https://accounts.spotify.com/authorize?${params}`);
+  });
 });
 
 authRouter.get("/callback", async (req: Request, res: Response) => {
