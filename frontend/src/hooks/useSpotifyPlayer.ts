@@ -122,7 +122,7 @@ export function useSpotifyPlayer() {
           album: {
             id: "",
             name: track.album.name,
-            uri: track.album.uri,
+            uri: (track.album as unknown as { uri?: string }).uri ?? "",
             images: track.album.images,
             artists: [],
             release_date: "",
