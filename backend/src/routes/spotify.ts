@@ -344,6 +344,45 @@ spotifyRouter.get("/sdk-token", (req: Request, res: Response) => {
   res.json({ token: req.session.accessToken });
 });
 
+// Check if tracks are saved
+spotifyRouter.get("/me/tracks/contains", async (req: Request, res: Response) => {
+  try {
+    const data = await spotifyFetch(
+      req.session.accessToken!,
+      `/me/tracks/contains?ids=${req.query.ids}`
+    );
+    res.json(data);
+  } catch (err: unknown) {
+    res.status(500).json({ error: String(err) });
+  }
+});
+
+// Save tracks
+spotifyRouter.put("/me/tracks", async (req: Request, res: Response) => {
+  try {
+    await spotifyFetch(req.session.accessToken!, "/me/tracks", {
+      method: "PUT",
+      body: JSON.stringify({ ids: req.body.ids }),
+    });
+    res.json({ success: true });
+  } catch (err: unknown) {
+    res.status(500).json({ error: String(err) });
+  }
+});
+
+// Remove tracks
+spotifyRouter.delete("/me/tracks", async (req: Request, res: Response) => {
+  try {
+    await spotifyFetch(req.session.accessToken!, "/me/tracks", {
+      method: "DELETE",
+      body: JSON.stringify({ ids: req.body.ids }),
+    });
+    res.json({ success: true });
+  } catch (err: unknown) {
+    res.status(500).json({ error: String(err) });
+  }
+});
+
 // Create playlist
 spotifyRouter.post("/users/:userId/playlists", async (req: Request, res: Response) => {
   try {

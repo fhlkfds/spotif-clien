@@ -11,6 +11,7 @@ import {
   VolumeX,
   Download,
   Heart,
+  Monitor,
 } from "lucide-react";
 import { useStore } from "../store/useStore";
 import { spotify, downloads } from "../api/client";
@@ -18,9 +19,7 @@ import { PluginSystem } from "../plugins/PluginSystem";
 
 function formatTime(ms: number) {
   const s = Math.floor(ms / 1000);
-  const min = Math.floor(s / 60);
-  const sec = s % 60;
-  return `${min}:${sec.toString().padStart(2, "0")}`;
+  return `${Math.floor(s / 60)}:${(s % 60).toString().padStart(2, "0")}`;
 }
 
 export default function Player() {
@@ -28,66 +27,63 @@ export default function Player() {
   const [progress, setProgress] = useState(0);
   const [volume, setVolume] = useState(50);
   const [isMuted, setIsMuted] = useState(false);
+  const [isLiked, setIsLiked] = useState(false);
+  const [likeLoading, setLikeLoading] = useState(false);
   const progressInterval = useRef<ReturnType<typeof setInterval> | null>(null);
   const prevTrackId = useRef<string | null>(null);
 
-  // Keep progress in sync
+  // Sync progress bar
   useEffect(() => {
     if (progressInterval.current) clearInterval(progressInterval.current);
     if (!playbackState) return;
-
     setProgress(playbackState.progress_ms);
-
     if (playbackState.is_playing) {
       progressInterval.current = setInterval(() => {
         setProgress((p) => Math.min(p + 1000, playbackState.item?.duration_ms ?? p));
       }, 1000);
     }
-
-    return () => {
-      if (progressInterval.current) clearInterval(progressInterval.current);
-    };
+    return () => { if (progressInterval.current) clearInterval(progressInterval.current); };
   }, [playbackState?.is_playing, playbackState?.progress_ms, playbackState?.item?.id]);
 
-  // Emit plugin events on track change
+  // Check liked state when track changes
   useEffect(() => {
     const track = playbackState?.item;
-    if (track && track.id !== prevTrackId.current) {
-      prevTrackId.current = track.id;
-      PluginSystem.emit("track:change", track);
-      PluginSystem.updatePlayerState(track, playbackState);
-    }
+    if (!track || track.id === prevTrackId.current) return;
+    prevTrackId.current = track.id;
+    PluginSystem.emit("track:change", track);
+    PluginSystem.updatePlayerState(track, playbackState);
+
+    spotify.checkSaved([track.id])
+      .then(([saved]) => setIsLiked(saved))
+      .catch(() => {});
   }, [playbackState?.item?.id]);
 
   const handlePlay = useCallback(async () => {
     if (!playbackState) return;
-    if (playbackState.is_playing) {
-      await spotify.pause();
-    } else {
-      await spotify.play({}, deviceId ?? undefined);
+    try {
+      if (playbackState.is_playing) {
+        await spotify.pause();
+      } else {
+        await spotify.play({}, deviceId ?? undefined);
+      }
+    } catch (e) {
+      console.error("Play/pause failed:", e);
     }
   }, [playbackState, deviceId]);
 
-  const handleSeek = useCallback(
-    async (e: React.MouseEvent<HTMLDivElement>) => {
-      const rect = e.currentTarget.getBoundingClientRect();
-      const pct = (e.clientX - rect.left) / rect.width;
-      const ms = Math.floor(pct * (playbackState?.item?.duration_ms ?? 0));
-      setProgress(ms);
-      await spotify.seek(ms);
-    },
-    [playbackState?.item?.duration_ms]
-  );
+  const handleSeek = useCallback(async (e: React.MouseEvent<HTMLDivElement>) => {
+    const rect = e.currentTarget.getBoundingClientRect();
+    const ms = Math.floor(((e.clientX - rect.left) / rect.width) * (playbackState?.item?.duration_ms ?? 0));
+    setProgress(ms);
+    await spotify.seek(ms);
+  }, [playbackState?.item?.duration_ms]);
 
-  const handleVolumeChange = useCallback(
-    async (e: React.ChangeEvent<HTMLInputElement>) => {
-      const vol = Number(e.target.value);
-      setVolume(vol);
-      setIsMuted(vol === 0);
-      await spotify.volume(vol);
-    },
-    []
-  );
+  const handleVolumeChange = useCallback(async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const vol = Number(e.target.value);
+    setVolume(vol);
+    setIsMuted(vol === 0);
+    await spotify.volume(vol);
+  }, []);
 
   const toggleMute = useCallback(async () => {
     const newVol = isMuted ? volume : 0;
@@ -95,16 +91,39 @@ export default function Player() {
     await spotify.volume(newVol);
   }, [isMuted, volume]);
 
+  const toggleLike = useCallback(async () => {
+    const track = playbackState?.item;
+    if (!track || likeLoading) return;
+    setLikeLoading(true);
+    try {
+      if (isLiked) {
+        await spotify.removeTrack(track.id);
+        setIsLiked(false);
+      } else {
+        await spotify.saveTrack(track.id);
+        setIsLiked(true);
+      }
+    } catch (e) {
+      console.error("Like toggle failed:", e);
+    } finally {
+      setLikeLoading(false);
+    }
+  }, [playbackState?.item, isLiked, likeLoading]);
+
   const handleDownload = useCallback(async () => {
     const track = playbackState?.item;
     if (!track) return;
-    await downloads.start({
-      track_name: track.name,
-      artist_name: track.artists.map((a) => a.name).join(", "),
-      track_id: track.id,
-      format: "mp3",
-    });
-    alert("Download started! Check Settings > Downloads");
+    try {
+      await downloads.start({
+        track_name: track.name,
+        artist_name: track.artists.map((a) => a.name).join(", "),
+        track_id: track.id,
+        format: "mp3",
+      });
+      alert("Download queued — check Settings → Downloads");
+    } catch {
+      alert("Download failed");
+    }
   }, [playbackState?.item]);
 
   const track = playbackState?.item;
@@ -126,44 +145,48 @@ export default function Player() {
         height: "100%",
       }}
     >
-      {/* Track info */}
+      {/* Track info + like */}
       <div style={{ display: "flex", alignItems: "center", gap: 12, minWidth: 0 }}>
         {track?.album?.images?.[0]?.url ? (
           <img
             src={track.album.images[0].url}
             alt={track.album.name}
-            style={{ width: 56, height: 56, borderRadius: 4, objectFit: "cover" }}
+            style={{ width: 56, height: 56, borderRadius: 4, objectFit: "cover", flexShrink: 0 }}
           />
         ) : (
-          <div
-            style={{
-              width: 56,
-              height: 56,
-              borderRadius: 4,
-              background: "var(--bg-tertiary)",
-            }}
-          />
+          <div style={{ width: 56, height: 56, borderRadius: 4, background: "var(--bg-tertiary)", flexShrink: 0 }} />
         )}
         {track && (
-          <div style={{ minWidth: 0 }}>
-            <div className="truncate" style={{ fontSize: 14, fontWeight: 600 }}>
-              {track.name}
-            </div>
+          <div style={{ minWidth: 0, flex: 1 }}>
+            <div className="truncate" style={{ fontSize: 14, fontWeight: 600 }}>{track.name}</div>
             <div className="truncate text-secondary" style={{ fontSize: 12 }}>
               {track.artists.map((a) => a.name).join(", ")}
             </div>
           </div>
         )}
         {track && (
-          <div style={{ display: "flex", gap: 4, flexShrink: 0 }}>
-            <button className="btn-ghost" style={{ padding: 4 }} title="Download">
-              <Heart size={16} />
-            </button>
-          </div>
+          <button
+            onClick={toggleLike}
+            disabled={likeLoading}
+            title={isLiked ? "Remove from Liked Songs" : "Save to Liked Songs"}
+            style={{
+              background: "none",
+              border: "none",
+              cursor: likeLoading ? "not-allowed" : "pointer",
+              padding: 4,
+              color: isLiked ? "var(--accent)" : "var(--text-secondary)",
+              transition: "color 0.15s, transform 0.1s",
+              flexShrink: 0,
+            }}
+            onMouseEnter={(e) => !isLiked && (e.currentTarget.style.color = "var(--text-primary)")}
+            onMouseLeave={(e) => !isLiked && (e.currentTarget.style.color = "var(--text-secondary)")}
+          >
+            <Heart size={18} fill={isLiked ? "currentColor" : "none"} />
+          </button>
         )}
       </div>
 
-      {/* Controls */}
+      {/* Playback controls + progress */}
       <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 8 }}>
         <div style={{ display: "flex", alignItems: "center", gap: 16 }}>
           <button
@@ -182,16 +205,10 @@ export default function Player() {
           <button
             onClick={handlePlay}
             style={{
-              width: 36,
-              height: 36,
-              borderRadius: "50%",
-              background: "var(--text-primary)",
-              border: "none",
-              cursor: "pointer",
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-              color: "var(--bg-primary)",
+              width: 36, height: 36, borderRadius: "50%",
+              background: "var(--text-primary)", border: "none",
+              cursor: "pointer", display: "flex", alignItems: "center",
+              justifyContent: "center", color: "var(--bg-primary)",
               transition: "transform 0.1s",
             }}
             onMouseEnter={(e) => (e.currentTarget.style.transform = "scale(1.05)")}
@@ -207,24 +224,17 @@ export default function Player() {
           <button
             className="btn-ghost"
             onClick={() => {
-              const next =
-                repeatState === "off"
-                  ? "context"
-                  : repeatState === "context"
-                  ? "track"
-                  : "off";
+              const next = repeatState === "off" ? "context" : repeatState === "context" ? "track" : "off";
               spotify.repeat(next);
             }}
-            style={{
-              color: repeatState !== "off" ? "var(--accent)" : "var(--text-secondary)",
-            }}
+            style={{ color: repeatState !== "off" ? "var(--accent)" : "var(--text-secondary)" }}
             title="Repeat"
           >
             {repeatState === "track" ? <Repeat1 size={18} /> : <Repeat size={18} />}
           </button>
         </div>
 
-        {/* Progress */}
+        {/* Progress bar */}
         <div style={{ display: "flex", alignItems: "center", gap: 8, width: "100%" }}>
           <span style={{ fontSize: 11, color: "var(--text-secondary)", width: 36, textAlign: "right" }}>
             {formatTime(progress)}
@@ -242,8 +252,23 @@ export default function Player() {
         </div>
       </div>
 
-      {/* Volume + extras */}
-      <div style={{ display: "flex", alignItems: "center", gap: 12, justifyContent: "flex-end" }}>
+      {/* Volume + device status + download */}
+      <div style={{ display: "flex", alignItems: "center", gap: 10, justifyContent: "flex-end" }}>
+        {/* Browser device indicator */}
+        <div
+          title={deviceId ? "Browser player ready" : "Browser player not connected"}
+          style={{
+            display: "flex",
+            alignItems: "center",
+            gap: 4,
+            fontSize: 11,
+            color: deviceId ? "var(--accent)" : "var(--text-muted)",
+          }}
+        >
+          <Monitor size={14} />
+          <span style={{ display: "none" }}>Browser</span>
+        </div>
+
         {track && (
           <button className="btn-ghost" onClick={handleDownload} title="Download track">
             <Download size={18} />
@@ -260,12 +285,7 @@ export default function Player() {
           max={100}
           value={isMuted ? 0 : volume}
           onChange={handleVolumeChange}
-          style={{
-            width: 90,
-            accentColor: "var(--accent)",
-            background: "transparent",
-            cursor: "pointer",
-          }}
+          style={{ width: 80, accentColor: "var(--accent)", background: "transparent", cursor: "pointer" }}
         />
       </div>
     </div>

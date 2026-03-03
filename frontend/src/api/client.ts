@@ -58,6 +58,11 @@ export const spotify = {
   createPlaylist: (userId: string, name: string, description = "") =>
     api.post(`/spotify/users/${userId}/playlists`, { name, description, public: false }).then((r) => r.data),
 
+  checkSaved: (ids: string[]) =>
+    api.get("/spotify/me/tracks/contains", { params: { ids: ids.join(",") } }).then((r) => r.data as boolean[]),
+  saveTrack: (id: string) => api.put("/spotify/me/tracks", { ids: [id] }),
+  removeTrack: (id: string) => api.delete("/spotify/me/tracks", { data: { ids: [id] } }),
+
   getDevices: () => api.get("/spotify/devices").then((r) => r.data),
 };
 
