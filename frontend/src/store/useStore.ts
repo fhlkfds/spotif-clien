@@ -11,9 +11,11 @@ interface AppStore {
   // Player
   playbackState: PlaybackState | null;
   deviceId: string | null;
+  sdkConnected: boolean;
   queue: SpotifyTrack[];
   setPlaybackState: (state: PlaybackState | null) => void;
   setDeviceId: (id: string) => void;
+  setSdkConnected: (v: boolean) => void;
   setQueue: (queue: SpotifyTrack[]) => void;
 
   // UI
@@ -38,9 +40,11 @@ export const useStore = create<AppStore>((set) => ({
   // Player
   playbackState: null,
   deviceId: null,
+  sdkConnected: false,
   queue: [],
   setPlaybackState: (playbackState) => set({ playbackState }),
   setDeviceId: (deviceId) => set({ deviceId }),
+  setSdkConnected: (sdkConnected) => set({ sdkConnected }),
   setQueue: (queue) => set({ queue }),
 
   // UI

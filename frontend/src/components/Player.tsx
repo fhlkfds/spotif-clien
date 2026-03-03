@@ -16,6 +16,7 @@ import {
 import { useStore } from "../store/useStore";
 import { spotify, downloads } from "../api/client";
 import { PluginSystem } from "../plugins/PluginSystem";
+import { AlertTriangle } from "lucide-react";
 
 function formatTime(ms: number) {
   const s = Math.floor(ms / 1000);
@@ -23,7 +24,17 @@ function formatTime(ms: number) {
 }
 
 export default function Player() {
-  const { playbackState, deviceId } = useStore();
+  const { playbackState, deviceId, sdkConnected, isPremium } = useStore();
+  const [sdkWarningDismissed, setSdkWarningDismissed] = useState(false);
+  // Give the SDK 8 seconds to connect before showing the warning
+  const [sdkTimeout, setSdkTimeout] = useState(false);
+  useEffect(() => {
+    if (!isPremium) return;
+    const t = setTimeout(() => setSdkTimeout(true), 8000);
+    return () => clearTimeout(t);
+  }, [isPremium]);
+
+  const showSdkWarning = isPremium && sdkTimeout && !sdkConnected && !sdkWarningDismissed;
   const [progress, setProgress] = useState(0);
   const [volume, setVolume] = useState(50);
   const [isMuted, setIsMuted] = useState(false);
@@ -134,6 +145,47 @@ export default function Player() {
   const repeatState = playbackState?.repeat_state ?? "off";
 
   return (
+    <>
+    {showSdkWarning && (
+      <div style={{
+        position: "fixed",
+        bottom: 96,
+        left: "50%",
+        transform: "translateX(-50%)",
+        background: "#1a1a2e",
+        border: "1px solid var(--warning, #e3a120)",
+        borderRadius: 8,
+        padding: "12px 16px",
+        zIndex: 1000,
+        maxWidth: 480,
+        width: "calc(100% - 32px)",
+        display: "flex",
+        gap: 12,
+        alignItems: "flex-start",
+        boxShadow: "0 8px 32px rgba(0,0,0,0.6)",
+      }}>
+        <AlertTriangle size={18} color="var(--warning, #e3a120)" style={{ flexShrink: 0, marginTop: 2 }} />
+        <div style={{ flex: 1, fontSize: 13 }}>
+          <div style={{ fontWeight: 700, marginBottom: 4, color: "var(--warning, #e3a120)" }}>
+            Browser player blocked
+          </div>
+          <div style={{ color: "var(--text-secondary)", lineHeight: 1.5 }}>
+            Your ad blocker is blocking Spotify's SDK connections.
+            Disable it for this page (and whitelist <code style={{ background: "var(--bg-tertiary)", padding: "1px 4px", borderRadius: 3 }}>*.spotify.com</code>),
+            then refresh.
+          </div>
+          <div style={{ marginTop: 8, color: "var(--text-muted)", fontSize: 12 }}>
+            You can still control playback from the Spotify app on another device.
+          </div>
+        </div>
+        <button
+          onClick={() => setSdkWarningDismissed(true)}
+          style={{ background: "none", border: "none", cursor: "pointer", color: "var(--text-muted)", padding: 2, flexShrink: 0 }}
+        >
+          ✕
+        </button>
+      </div>
+    )}
     <div
       className="player-bar"
       style={{
@@ -289,5 +341,6 @@ export default function Player() {
         />
       </div>
     </div>
+    </>
   );
 }

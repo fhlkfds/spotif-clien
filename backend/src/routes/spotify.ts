@@ -6,6 +6,16 @@ export const spotifyRouter = Router();
 spotifyRouter.use(refreshTokenIfNeeded);
 spotifyRouter.use(requireAuth);
 
+class SpotifyApiError extends Error {
+  constructor(public statusCode: number, message: string) {
+    super(message);
+  }
+}
+
+function errStatus(err: unknown): number {
+  return err instanceof SpotifyApiError ? err.statusCode : 500;
+}
+
 async function spotifyFetch(token: string, path: string, options?: RequestInit) {
   const res = await fetch(`https://api.spotify.com/v1${path}`, {
     ...options,
@@ -19,7 +29,7 @@ async function spotifyFetch(token: string, path: string, options?: RequestInit) 
   if (res.status === 204) return null;
   if (!res.ok) {
     const body = await res.text();
-    throw new Error(`Spotify API error ${res.status}: ${body}`);
+    throw new SpotifyApiError(res.status, `Spotify ${res.status}: ${body}`);
   }
   return res.json();
 }
@@ -34,7 +44,7 @@ spotifyRouter.get("/search", async (req: Request, res: Response) => {
     );
     res.json(data);
   } catch (err: unknown) {
-    res.status(500).json({ error: String(err) });
+    res.status(errStatus(err)).json({ error: String(err) });
   }
 });
 
@@ -44,7 +54,7 @@ spotifyRouter.get("/player", async (req: Request, res: Response) => {
     const data = await spotifyFetch(req.session.accessToken!, "/me/player");
     res.json(data);
   } catch (err: unknown) {
-    res.status(500).json({ error: String(err) });
+    res.status(errStatus(err)).json({ error: String(err) });
   }
 });
 
@@ -59,7 +69,7 @@ spotifyRouter.post("/player/play", async (req: Request, res: Response) => {
     });
     res.json({ success: true });
   } catch (err: unknown) {
-    res.status(500).json({ error: String(err) });
+    res.status(errStatus(err)).json({ error: String(err) });
   }
 });
 
@@ -70,7 +80,7 @@ spotifyRouter.post("/player/pause", async (req: Request, res: Response) => {
     });
     res.json({ success: true });
   } catch (err: unknown) {
-    res.status(500).json({ error: String(err) });
+    res.status(errStatus(err)).json({ error: String(err) });
   }
 });
 
@@ -81,7 +91,7 @@ spotifyRouter.post("/player/next", async (req: Request, res: Response) => {
     });
     res.json({ success: true });
   } catch (err: unknown) {
-    res.status(500).json({ error: String(err) });
+    res.status(errStatus(err)).json({ error: String(err) });
   }
 });
 
@@ -92,7 +102,7 @@ spotifyRouter.post("/player/previous", async (req: Request, res: Response) => {
     });
     res.json({ success: true });
   } catch (err: unknown) {
-    res.status(500).json({ error: String(err) });
+    res.status(errStatus(err)).json({ error: String(err) });
   }
 });
 
@@ -106,7 +116,7 @@ spotifyRouter.post("/player/seek", async (req: Request, res: Response) => {
     );
     res.json({ success: true });
   } catch (err: unknown) {
-    res.status(500).json({ error: String(err) });
+    res.status(errStatus(err)).json({ error: String(err) });
   }
 });
 
@@ -120,7 +130,7 @@ spotifyRouter.post("/player/volume", async (req: Request, res: Response) => {
     );
     res.json({ success: true });
   } catch (err: unknown) {
-    res.status(500).json({ error: String(err) });
+    res.status(errStatus(err)).json({ error: String(err) });
   }
 });
 
@@ -134,7 +144,7 @@ spotifyRouter.post("/player/shuffle", async (req: Request, res: Response) => {
     );
     res.json({ success: true });
   } catch (err: unknown) {
-    res.status(500).json({ error: String(err) });
+    res.status(errStatus(err)).json({ error: String(err) });
   }
 });
 
@@ -148,7 +158,7 @@ spotifyRouter.post("/player/repeat", async (req: Request, res: Response) => {
     );
     res.json({ success: true });
   } catch (err: unknown) {
-    res.status(500).json({ error: String(err) });
+    res.status(errStatus(err)).json({ error: String(err) });
   }
 });
 
@@ -161,7 +171,7 @@ spotifyRouter.post("/player/transfer", async (req: Request, res: Response) => {
     });
     res.json({ success: true });
   } catch (err: unknown) {
-    res.status(500).json({ error: String(err) });
+    res.status(errStatus(err)).json({ error: String(err) });
   }
 });
 
@@ -185,7 +195,7 @@ spotifyRouter.post("/player/log", async (req: Request, res: Response) => {
     );
     res.json({ success: true });
   } catch (err: unknown) {
-    res.status(500).json({ error: String(err) });
+    res.status(errStatus(err)).json({ error: String(err) });
   }
 });
 
@@ -198,7 +208,7 @@ spotifyRouter.get("/me/playlists", async (req: Request, res: Response) => {
     );
     res.json(data);
   } catch (err: unknown) {
-    res.status(500).json({ error: String(err) });
+    res.status(errStatus(err)).json({ error: String(err) });
   }
 });
 
@@ -211,7 +221,7 @@ spotifyRouter.get("/me/tracks", async (req: Request, res: Response) => {
     );
     res.json(data);
   } catch (err: unknown) {
-    res.status(500).json({ error: String(err) });
+    res.status(errStatus(err)).json({ error: String(err) });
   }
 });
 
@@ -225,7 +235,7 @@ spotifyRouter.get("/me/top/:type", async (req: Request, res: Response) => {
     );
     res.json(data);
   } catch (err: unknown) {
-    res.status(500).json({ error: String(err) });
+    res.status(errStatus(err)).json({ error: String(err) });
   }
 });
 
@@ -237,7 +247,7 @@ spotifyRouter.get("/me/recently-played", async (req: Request, res: Response) => 
     );
     res.json(data);
   } catch (err: unknown) {
-    res.status(500).json({ error: String(err) });
+    res.status(errStatus(err)).json({ error: String(err) });
   }
 });
 
@@ -250,7 +260,7 @@ spotifyRouter.get("/playlists/:id", async (req: Request, res: Response) => {
     );
     res.json(data);
   } catch (err: unknown) {
-    res.status(500).json({ error: String(err) });
+    res.status(errStatus(err)).json({ error: String(err) });
   }
 });
 
@@ -263,7 +273,7 @@ spotifyRouter.get("/playlists/:id/tracks", async (req: Request, res: Response) =
     );
     res.json(data);
   } catch (err: unknown) {
-    res.status(500).json({ error: String(err) });
+    res.status(errStatus(err)).json({ error: String(err) });
   }
 });
 
@@ -276,7 +286,7 @@ spotifyRouter.get("/albums/:id", async (req: Request, res: Response) => {
     );
     res.json(data);
   } catch (err: unknown) {
-    res.status(500).json({ error: String(err) });
+    res.status(errStatus(err)).json({ error: String(err) });
   }
 });
 
@@ -289,7 +299,7 @@ spotifyRouter.get("/artists/:id", async (req: Request, res: Response) => {
     );
     res.json(data);
   } catch (err: unknown) {
-    res.status(500).json({ error: String(err) });
+    res.status(errStatus(err)).json({ error: String(err) });
   }
 });
 
@@ -303,7 +313,7 @@ spotifyRouter.get(
       );
       res.json(data);
     } catch (err: unknown) {
-      res.status(500).json({ error: String(err) });
+      res.status(errStatus(err)).json({ error: String(err) });
     }
   }
 );
@@ -322,7 +332,7 @@ spotifyRouter.get("/recommendations", async (req: Request, res: Response) => {
     );
     res.json(data);
   } catch (err: unknown) {
-    res.status(500).json({ error: String(err) });
+    res.status(errStatus(err)).json({ error: String(err) });
   }
 });
 
@@ -335,7 +345,7 @@ spotifyRouter.get("/devices", async (req: Request, res: Response) => {
     );
     res.json(data);
   } catch (err: unknown) {
-    res.status(500).json({ error: String(err) });
+    res.status(errStatus(err)).json({ error: String(err) });
   }
 });
 
@@ -353,7 +363,7 @@ spotifyRouter.get("/me/tracks/contains", async (req: Request, res: Response) => 
     );
     res.json(data);
   } catch (err: unknown) {
-    res.status(500).json({ error: String(err) });
+    res.status(errStatus(err)).json({ error: String(err) });
   }
 });
 
@@ -366,7 +376,7 @@ spotifyRouter.put("/me/tracks", async (req: Request, res: Response) => {
     });
     res.json({ success: true });
   } catch (err: unknown) {
-    res.status(500).json({ error: String(err) });
+    res.status(errStatus(err)).json({ error: String(err) });
   }
 });
 
@@ -379,7 +389,7 @@ spotifyRouter.delete("/me/tracks", async (req: Request, res: Response) => {
     });
     res.json({ success: true });
   } catch (err: unknown) {
-    res.status(500).json({ error: String(err) });
+    res.status(errStatus(err)).json({ error: String(err) });
   }
 });
 
@@ -397,6 +407,6 @@ spotifyRouter.post("/users/:userId/playlists", async (req: Request, res: Respons
     );
     res.json(data);
   } catch (err: unknown) {
-    res.status(500).json({ error: String(err) });
+    res.status(errStatus(err)).json({ error: String(err) });
   }
 });

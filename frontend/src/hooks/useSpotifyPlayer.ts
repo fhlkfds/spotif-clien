@@ -51,7 +51,7 @@ interface SpotifyPlayerState {
 }
 
 export function useSpotifyPlayer() {
-  const { isPremium, setPlaybackState, setDeviceId } = useStore();
+  const { isPremium, setPlaybackState, setDeviceId, setSdkConnected } = useStore();
   const playerRef = useRef<SpotifyPlayer | null>(null);
   const lastLoggedTrackId = useRef<string | null>(null);
 
@@ -90,6 +90,7 @@ export function useSpotifyPlayer() {
       const { device_id } = state as { device_id: string };
       console.log("[SDK] Browser player ready, device:", device_id);
       setDeviceId(device_id);
+      setSdkConnected(true);
       // Make this browser tab the active playback device (don't auto-start)
       spotify.transfer([device_id], false).catch(() => {});
     });
@@ -97,7 +98,11 @@ export function useSpotifyPlayer() {
     player.addListener("not_ready", (state: unknown) => {
       const { device_id } = state as { device_id: string };
       console.warn("[SDK] Device went offline:", device_id);
+      setSdkConnected(false);
     });
+
+    player.addListener("authentication_error", () => setSdkConnected(false));
+    player.addListener("initialization_error", () => setSdkConnected(false));
 
     player.addListener("player_state_changed", (state: unknown) => {
       const s = state as SpotifyPlayerState | null;
@@ -154,7 +159,7 @@ export function useSpotifyPlayer() {
     } else {
       console.error("[SDK] Player failed to connect");
     }
-  }, [isPremium, setDeviceId, setPlaybackState]);
+  }, [isPremium, setDeviceId, setPlaybackState, setSdkConnected]);
 
   useEffect(() => {
     if (!isPremium) return;
